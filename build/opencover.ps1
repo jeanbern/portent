@@ -35,7 +35,7 @@ $target_dll = "..\portent.Test\bin\Release\netcoreapp3.0\portent.Test.dll"
 	-threshold:1 -oldStyle `
 	-returntargetcode `
 	-hideskipped:All `
-	-filter:"+[StyleCop*]*" `
+	-filter:"+[portent*]* -[portent.Test*]*" `
 	-excludebyattribute:*.ExcludeFromCodeCoverage* `
 	-excludebyfile:*\*Designer.cs `
 	-output:"$report_file" `
@@ -44,7 +44,7 @@ $target_dll = "..\portent.Test\bin\Release\netcoreapp3.0\portent.Test.dll"
 	-targetargs:"$target_dll -noshadow -appveyor"
 
 # Do I even need to do this if I'm only targeting C# 8?
-&$report_generator -targetdir:$report_folder -reports:"$report_file"
+.\$report_generator -targetdir:$report_folder -reports:"$report_file"
 
 If (-not $?) {
 	$host.UI.WriteErrorLine('Build failed; coverage analysis aborted.')
