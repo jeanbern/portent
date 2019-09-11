@@ -11,7 +11,7 @@ $reportgenerator_version = $packageConfig.SelectSingleNode('/packages/package[@i
 $report_generator = "$packages_folder\ReportGenerator.$reportgenerator_version\tools\ReportGenerator.exe"
 
 $xunitrunner_version = $packageConfig.SelectSingleNode('/packages/package[@id="xunit.runner.console"]').version
-$xunit_runner_console = "$packages_folder\xunit.runner.console.$xunitrunner_version\tools\xunit.console.x86.exe"
+$xunit_runner_console = "$packages_folder\xunit.runner.console.$xunitrunner_version\tools\xunit.console.exe"
 
 $report_folder = '.\OpenCoverReports'
 If (Test-Path $report_folder) {
