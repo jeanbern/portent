@@ -7,11 +7,17 @@ $opencover_console = "$packages_folder\OpenCover.$opencover_version\tools\OpenCo
 $codecov_version = $packageConfig.SelectSingleNode('/packages/package[@id="Codecov"]').version
 $codecov = "$packages_folder\Codecov.$codecov_version\tools\codecov.exe"
 
-$reportgenerator_version = $packageConfig.SelectSingleNode('/packages/package[@id="ReportGenerator"]').version
-$report_generator = "$packages_folder\ReportGenerator.$reportgenerator_version\tools\ReportGenerator.dll"
+# This one has a targetFramework
+$report_generator_node = $packageConfig.SelectSingleNode('/packages/package[@id="ReportGenerator"]')
+$report_generator_version = $report_generator_node.version
+$report_generator_framework = $report_generator_node.targetFramework
+$report_generator = "$packages_folder\ReportGenerator.$report_generator_version\tools\$report_generator_framework\ReportGenerator.dll"
 
-$xunitrunner_version = $packageConfig.SelectSingleNode('/packages/package[@id="xunit.runner.console"]').version
-$xunit_runner_console = "$packages_folder\xunit.runner.console.$xunitrunner_version\tools\xunit.console.dll"
+# This one has a targetFramework
+$xunit_runner_node = $packageConfig.SelectSingleNode('/packages/package[@id="xunit.runner.console"]')
+$xunit_runner_version = $xunit_runner_node.version
+$xunit_runner_framework = $xunit_runner_node.targetFramework
+$xunit_runner_console = "$packages_folder\xunit.runner.console.$xunit_runner_version\tools\$xunit_runner_framework\xunit.console.dll"
 
 $report_folder = '.\OpenCoverReports'
 If (Test-Path $report_folder) {
