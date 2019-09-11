@@ -68,7 +68,7 @@ before_build:
 # to run your custom scripts instead of automatic tests
 test_script:
   - cd build
-  - ps: .\opencover.ps1
+  - pwsh: .\opencover.ps1
 
 
 #---------------------------------#

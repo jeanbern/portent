@@ -8,10 +8,10 @@ $codecov_version = $packageConfig.SelectSingleNode('/packages/package[@id="Codec
 $codecov = "$packages_folder\Codecov.$codecov_version\tools\codecov.exe"
 
 $reportgenerator_version = $packageConfig.SelectSingleNode('/packages/package[@id="ReportGenerator"]').version
-$report_generator = "$packages_folder\ReportGenerator.$reportgenerator_version\tools\ReportGenerator.exe"
+$report_generator = "$packages_folder\ReportGenerator.$reportgenerator_version\tools\ReportGenerator.dll"
 
 $xunitrunner_version = $packageConfig.SelectSingleNode('/packages/package[@id="xunit.runner.console"]').version
-$xunit_runner_console = "$packages_folder\xunit.runner.console.$xunitrunner_version\tools\xunit.console.exe"
+$xunit_runner_console = "$packages_folder\xunit.runner.console.$xunitrunner_version\tools\xunit.console.dll"
 
 $report_folder = '.\OpenCoverReports'
 If (Test-Path $report_folder) {
