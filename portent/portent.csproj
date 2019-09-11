@@ -1,11 +1,40 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp3.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
+
+    <SignAssembly>false</SignAssembly>
+    <DelaySign>false</DelaySign>
+    <GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
+
+    <NullableContextOptions>enable</NullableContextOptions>
+    <Nullable>enable</Nullable>
+    <ILLinkClearInitLocals>true</ILLinkClearInitLocals>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Codecov" Version="1.7.2" />
-  </ItemGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
 
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <Optimize>true</Optimize>
+    <PlatformTarget>x64</PlatformTarget>
+
+    <!-- Use together -->
+    <PublishTrimmed>true</PublishTrimmed>
+    <PublishReadyToRun>true</PublishReadyToRun>
+
+    <!-- Use together -->
+    <TieredCompilation>true</TieredCompilation>
+    <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
+
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <GCLargePages>true</GCLargePages>
+    <DefineConstants></DefineConstants>
+
+  </PropertyGroup>
 </Project>
