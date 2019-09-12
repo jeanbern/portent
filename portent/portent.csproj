@@ -46,5 +46,6 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="LocalsInit.Fody" Version="1.1.0" />
+    <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="4.6.0-preview9.19421.4" />
   </ItemGroup>
 </Project>
