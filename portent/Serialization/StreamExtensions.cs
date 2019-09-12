@@ -665,7 +665,7 @@ namespace JBP
         }
 
         //https://reubenbond.github.io/posts/dotnet-perf-tuning Section: Use static throw helpers
-        [DoesNotReturn]
+        //[DoesNotReturn]
         private static void Throw(Exception e)
         {
             throw e;
