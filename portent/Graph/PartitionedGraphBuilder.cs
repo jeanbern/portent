@@ -2,12 +2,57 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime;
 
 namespace portent
 {
     public class PartitionedGraphBuilder
     {
-        const int MaxWordLength = 40;
+        public CompressedSparseRowGraph AsCompressedSparseRows()
+        {
+            var root = Finish();
+
+            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+            GC.Collect();
+
+            var edges = EdgeCount;
+            var allNodes = OrderedNodes;
+
+            var edgeToNodeIndex = new int[edges];
+            var edgeCharacter = new char[edges];
+            var firstChildEdgeIndex = new int[allNodes.Count + 1];
+            firstChildEdgeIndex[^1] = edgeToNodeIndex.Length;
+            var rootNodeIndex = root.OrderedId;
+            var reachableTerminalNodes = new ushort[allNodes.Count];
+
+            var edgeIndex = 0;
+            var nodeCount = 0;
+            foreach (var node in allNodes)
+            {
+                var nodeId = node.OrderedId;
+                Debug.Assert(nodeId == nodeCount);
+                ++nodeCount;
+                firstChildEdgeIndex[nodeId] = edgeIndex;
+                reachableTerminalNodes[nodeId] = (ushort)node.ReachableTerminalNodes;
+
+                foreach (var child in node.SortedChildren)
+                {
+                    var terminalModifier = child.Value.IsTerminal ? -1 : 1;
+                    edgeToNodeIndex[edgeIndex] = terminalModifier * child.Value.OrderedId;
+                    edgeCharacter[edgeIndex] = child.Key;
+                    ++edgeIndex;
+                }
+            }
+
+            var wordCounts = new long[WordCount];
+
+            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+            GC.Collect();
+
+            return new CompressedSparseRowGraph(rootNodeIndex, firstChildEdgeIndex, edgeToNodeIndex, edgeCharacter, reachableTerminalNodes, wordCounts, Counts);
+        }
+
+        private const int MaxWordLength = 40;
         private string _previousWord = string.Empty;
         private readonly GraphNode _root = new GraphNode();
         private readonly Dictionary<GraphNode, GraphNode> _minimizedNodes = new Dictionary<GraphNode, GraphNode>();
@@ -35,13 +80,13 @@ namespace portent
                 Console.WriteLine($"Insert: {WordCount.ToString()}");
             }
 
-            Debug.Assert(string.Compare(word, _previousWord, StringComparison.Ordinal) > 0);
+            Debug.Assert(string.CompareOrdinal(word, _previousWord) > 0);
             Debug.Assert(word.Length < MaxWordLength);
 
             var commonPrefix = CommonPrefixWithPreviousWord(word);
             Minimize(commonPrefix);
 
-            //1 to skip _root
+            // 1 to skip _root
             for (var i = 0; i <= commonPrefix && i <= _stackTop; i++)
             {
                 _parentStack[i].ChildEdges[word[i]].Count += count;
@@ -62,7 +107,8 @@ namespace portent
             }
 
             node.IsTerminal = true;
-            //node.Count = count;
+            // NOTE: Using log instead of straight value.
+            // Trying to smooth it because we go down weird branches to look for edits.
             node.Count = (long)Math.Log2(count);
             _previousWord = word;
             Counts.Add(word, count);
@@ -121,7 +167,10 @@ namespace portent
                 item.ChildrenCopy?.Remove(node);
             }
 
-            foreach (var item in node.ChildrenCopy.ToList())
+            var copyOfList = node.ChildrenCopy.ToList();
+#pragma warning disable U2U1203 // Use foreach efficiently - I am modifying the underlying collection
+            foreach (var item in copyOfList)
+#pragma warning restore U2U1203 // Use foreach efficiently
             {
                 var currentCount = item.Parents.Count;
                 parentCounts[item.Parents.Count].Remove(item);
@@ -154,7 +203,6 @@ namespace portent
             for (var i = 0; i <= parentMax; i++)
             {
                 parentCounts[i] = new HashSet<GraphNode>();
-
             }
 
             Console.WriteLine($"\t{stopwatch.ElapsedMilliseconds.ToString()}");
@@ -162,7 +210,6 @@ namespace portent
             {
                 parentCounts[node.Parents.Count].Add(node);
             }
-
 
             var potentials = parentCounts[0];
             var window = new Queue<GraphNode>();
@@ -198,14 +245,11 @@ namespace portent
 
                         if (decider.TryGetValue(childEdge.Target, out long result))
                         {
-                            //decider[child] += child.Count;
                             decider[childEdge.Target] += childEdge.Count;
-                            //decider[child] += 1;
                         }
                         else
                         {
                             decider.Add(childEdge.Target, childEdge.Count);
-                            //decider.Add(child, 1);
                         }
                     }
 
@@ -225,14 +269,11 @@ namespace portent
 
                             if (decider.TryGetValue(childEdge.Target, out long result))
                             {
-                                //decider[child] += child.Count;
                                 decider[childEdge.Target] += childEdge.Count;
-                                //decider[child] += 1;
                             }
                             else
                             {
                                 decider.Add(childEdge.Target, childEdge.Count);
-                                //decider.Add(child, 1);
                             }
                         }
                     }

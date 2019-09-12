@@ -140,7 +140,6 @@ namespace JBP
             }
         }
 
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static void WriteCompressed(this Stream stream, Span<uint> values)
         {
@@ -592,7 +591,7 @@ namespace JBP
         private static T[] AllocateUninitializedArray<T>(int length)
             where T : unmanaged
         {
-            //TODO: Probably unnecessary because of the unmanaged constraint
+            // TODO: Probably unnecessary because of the unmanaged constraint
             if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
             {
                 return new T[length];
@@ -643,7 +642,6 @@ namespace JBP
             }
         }
 
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static T[] ReadArray<T>(this Stream stream)
             where T : unmanaged
@@ -656,7 +654,6 @@ namespace JBP
             var length = stream.Read<int>();
 
             var results = AllocateUninitializedArray<T>(length);
-            //var results = new T[length];
 
             var tSpan = results.AsSpan();
             var span = MemoryMarshal.AsBytes(tSpan);

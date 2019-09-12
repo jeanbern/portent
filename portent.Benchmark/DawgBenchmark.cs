@@ -76,8 +76,6 @@ namespace portent.Benchmark
 
         public static Dawg CreateDictionary(string corpusPath, string savePath)
         {
-            var biggest = 0L;
-
             var builder = new PartitionedGraphBuilder();
             using (var stream = File.OpenRead(corpusPath))
             {
@@ -102,11 +100,12 @@ namespace portent.Benchmark
                     }
 
                     builder.Insert(lineTokens[0], me);
-                    biggest = Math.Max(biggest, me);
                 }
             }
 
-            return new Dawg(builder, savePath);
+            var compressedGraph = builder.AsCompressedSparseRows();
+            compressedGraph.Save(savePath);
+            return new Dawg(compressedGraph);
         }
 
         [Params(0, 1, 2, 3)]

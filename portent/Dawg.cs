@@ -15,10 +15,6 @@ namespace portent
 {
     public sealed unsafe class Dawg : IDisposable
     {
-        private readonly SingleElementSuggestItemCollection _oneSuggestion = new SingleElementSuggestItemCollection();
-        private readonly SuggestItemCollection _fakeList = new SuggestItemCollection(293);
-        private readonly CompoundSuggestItemCollection _listContainer;
-
         [LocalsInit(false)]
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public IEnumerable<SuggestItem> Lookup(in string word, int maxEdits)
@@ -28,8 +24,8 @@ namespace portent
                 var index = GetIndex(word);
                 if (index >= 0)
                 {
-                    _oneSuggestion.Update(word, _wordCounts[index]);
-                    return _oneSuggestion;
+                    _singleWordResult.Update(word, _wordCounts[index]);
+                    return _singleWordResult;
                 }
                 else
                 {
@@ -38,7 +34,14 @@ namespace portent
             }
 
             var wordLength = word.Length;
-            var input = stackalloc char[wordLength + 1];
+
+            // TODO: Why does it have wordLength + 1?
+            // I think that's for allowing transposition checks to happen, that's not right.
+            var inputLength = MemoryAlignmentHelper.GetCacheAlignedSize<char>(wordLength + 1);
+            var inputBytes = stackalloc byte[inputLength];
+            var input = MemoryAlignmentHelper.GetCacheAlignedStart<char>(inputBytes);
+
+            // Not going to bother with Unsafe.CopyBlock. It's a pain for no gain.
             for (var x = 0; x < word.Length; ++x)
             {
                 input[x] = word[x];
@@ -47,28 +50,23 @@ namespace portent
             if (maxEdits == 1)
             {
                 input[wordLength] = (char)0;
-                _fakeList.Clear();
-                OneEditLookup(input, word.Length);
-                return _fakeList;
+                _resultCollection.Clear();
+                OneEditLookup(input, wordLength);
+                return _resultCollection;
             }
 
-            _listContainer.Clear();
+            _compoundResultCollection.Clear();
+
+            var maxDepth = wordLength + maxEdits;
+            var toCacheLength = MemoryAlignmentHelper.GetCacheAlignedSize<int>(maxDepth);
+            var toCacheBytes = stackalloc byte[toCacheLength];
+            var toCache = MemoryAlignmentHelper.GetCacheAlignedStart<int>(toCacheBytes);
 
             var minTo = Math.Min(wordLength, (2 * maxEdits) + 1);
-            var maxDepth = wordLength + maxEdits;
-            var toCache = stackalloc int[maxDepth];
             for (var depth = 0; depth < maxDepth; ++depth)
             {
                 toCache[depth] = Math.Min(Math.Min(depth + 1, wordLength - depth) + maxEdits, minTo);
             }
-
-            //fixed (char* wPointer = word)
-            //Unsafe.CopyBlock(input, wPointer, (uint) (word.Length * sizeof(char)));
-
-            /*
-            Parallel.For(i, last, il => ParameterizedTaskStartV6(il, maxEdits, input, word.Length, toCache));
-            Enumerable.Range(i, last - i).AsParallel().WithDegreeOfParallelism(12).ForAll(il => ParameterizedTaskStartV6(il, maxEdits, input, word.Length, toCache));
-            //*/
 
             var tasks = _tasks;
             var rootFirst = _rootFirstChild;
@@ -80,7 +78,7 @@ namespace portent
                 {
                     //To avoid "access to modified closure" which was causing real issues.
                     var i1 = i;
-                    tasks[i - rootFirst] = Task.Run(() => ParameterizedTaskStartV6Max2(i1, input, wordLength, toCache));
+                    tasks[i - rootFirst] = Task.Run(() => Search2Edits(i1, input, wordLength, toCache));
                 }
             }
             else
@@ -89,13 +87,13 @@ namespace portent
                 {
                     //To avoid "access to modified closure" which was causing real issues.
                     var i1 = i;
-                    tasks[i - rootFirst] = Task.Run(() => ParameterizedTaskStartV6(i1, maxEdits, input, wordLength, toCache));
+                    tasks[i - rootFirst] = Task.Run(() => SearchWithEdits(i1, maxEdits, input, wordLength, toCache));
                 }
             }
 
             Task.WaitAll(tasks);
 
-            return _listContainer;
+            return _compoundResultCollection;
         }
 
         /// <summary>
@@ -112,10 +110,10 @@ namespace portent
             var edgeToNodeIndex = _edgeToNodeIndex;
             var characters = _edgeCharacter;
             var edgeIndex = _firstChildEdgeIndex;
-            var results = _fakeList;
+            var results = _resultCollection;
             var wordCount = _wordCounts;
 
-            //TODO: unroll this to avoid conditional secondTarget = ... ? ... : ...;
+            //TODO: unroll this and make the last occurent not check transpositions.
             for (var index = 0; index < wordLength; ++index)
             {
                 if (nextNode < 0)
@@ -293,9 +291,9 @@ namespace portent
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int Abs(int value)
         {
+            // Non-branching alternative to: return value > 0 ? value : -value;
             var mask = value >> 31;
             return (value + mask) ^ mask;
-            //return value > 0 ? value : -value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
@@ -338,23 +336,22 @@ next:;
                 var buffP = builder + builderLength;
                 Unsafe.CopyBlock(buffP, input, (uint)(inputRemaining * sizeof(char)));
 
-                // match{1..*}
-                _fakeList.Add(new SuggestItem(new string(builder, 0, builderLength + inputRemaining), _wordCounts[GetIndex(builder, builderLength + inputRemaining)]));
+                _resultCollection.Add(new SuggestItem(new string(builder, 0, builderLength + inputRemaining), _wordCounts[GetIndex(builder, builderLength + inputRemaining)]));
             }
         }
 
         [LocalsInit(false)]
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-        private void ParameterizedTaskStartV6Max2(int edge, // Not captured
+        private void Search2Edits(int edge, // Not captured
             char* word, int wordLength, int* toCache)
         {
-            //TODO: Test most of these locals to see if it's faster to capture or re-calculate them every time.
+            // TODO: Test most of these locals to see if it's faster to capture or re-calculate them every time.
 
+            // The real stripeWidth is usually 2*max + 1 = 5
             // Normally we would do a bound check and calculate a value for the cell in previousRow directly after our stripe.
             // Instead we pre-assign the cell when we have the values handy and then ignore bound checking. See: {05054B58-4553-4DAD-915F-25A3D4E3A735}
-            // For this reason, the stripeWidth gets a +1
-            // The real stripeWidth is usually 2*max + 1 = 5
-            //TODO: Testing with 8 for cache boundary divisibility. Shouldn't matter?
+            // For this reason, the stripeWidth gets an additional + 1, making it 2 * max + 2 = 6
+            // TODO: Testing with 8 for cache boundary divisibility. Shouldn't matter?
             const int stripeWidth = 8;
 
             // +2 for maxEdits = 2, then distribute the multiplication to take advantage of const.
@@ -365,12 +362,12 @@ next:;
             var builderByteCount = MemoryAlignmentHelper.GetCacheAlignedSize<char>(wordLength + 2);
             var builderBytes = stackalloc byte[builderByteCount];
 
-            //TODO: If these are captured in a closure anyways, is it faster to just look them up?
+            // TODO: If these are captured in a closure anyways, is it faster to just look them up?
             var edgeToNodeIndex = _edgeToNodeIndex;
             var edgeCharacters = _edgeCharacter;
             var edgeIndex = _firstChildEdgeIndex;
             var wordCount = _wordCounts;
-            var results = _listContainer.Bags[edge - _rootFirstChild];
+            var results = _compoundResultCollection.Bags[edge - _rootFirstChild];
 
             // These 2 variables are used in all MatchCharacter functions
             var builder = MemoryAlignmentHelper.GetCacheAlignedStart<char>(builderBytes);
@@ -388,7 +385,8 @@ next:;
             void MatchCharacterX(int skipOriginal)
             {
                 var skip = skipOriginal;
-                //This is the value for the column directly before our diagonal stripe. See: {0FB913DD-0461-4DAF-8C97-ECDE0A9880AD}
+                // This is the value for the column directly before our diagonal stripe.
+                // In this case, 3 is too many anyways, so no need to compute it.
                 var currentRowPreviousColumn = 3;
 
                 // Normally the strip would travel diagonally through the matrix. We shift it left to keep it starting at 0.
@@ -459,7 +457,8 @@ next:;
                 // In addition, we perform this write even when it's not necessary because checking that condition is more expensive.
                 currentRow[to] = currentRowPreviousColumn + 1;
 
-                //TODO: Is it faster to use a temp for this loop and write to skip after? Would save some writes to memory, but probably pretty cheap since it's in L1 already.
+                // TODO: Is it faster to use a temp for this loop and write to skip after?
+                // Would use a register instead of writing to a variable.
                 if (currentRow[skip] > 2)
                 {
                     ++skip;
@@ -512,7 +511,6 @@ next:;
                 var previousWordCharacter = firstWithOffset[skip];
 
                 var any = 0;
-                //var too = to3;// + 1; //NOTICE THIS OFFSET, it's for the stripe-width not all being in use.
                 for (var j = skip; j < to3; ++j)
                 {
                     var previousRowCurrentColumn = row2[j + 1];
@@ -550,10 +548,10 @@ next:;
                     return;
                 }
 
-                //TODO: can I simplify these checks?
+                // TODO: can I simplify these checks?
                 if (node < 0 && currentRowPreviousColumn <= 2 && wordLength <= 6)
                 {
-                    //TODO: investigate Tuple.Create vs new Tuple
+                    // TODO: investigate Tuple.Create vs new Tuple
                     results.Add(new SuggestItem(new string(builder, 0, 4), wordCount[GetIndex(builder, 4)]));
                 }
 
@@ -781,16 +779,16 @@ next:;
 
         [LocalsInit(false)]
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-        private void ParameterizedTaskStartV6(int edge, // Not captured
+        private void SearchWithEdits(int edge, // Not captured
             int max, char* first, int wordLength, int* toCache)
         {
             var index = _edgeToNodeIndex;
             var characters = _edgeCharacter;
             var edgeIndex = _firstChildEdgeIndex;
             var wordCount = _wordCounts;
-            var results = _listContainer.Bags[edge % _listContainer.BagCount];
+            var results = _compoundResultCollection.Bags[edge % _compoundResultCollection.BagCount];
 
-            //TODO: test if this is faster captured in the closure or re-calculated every time.
+            // TODO: test if this is faster captured in the closure or re-calculated every time.
             // The real stripeWidth is 2*max + 1
             // Normally we would do a bound check and calculate a value for the cell in previousRow directly after our stripe.
             // Instead we pre-assign the cell when we have the values handy and then ignore bound checking. See: {05054B58-4553-4DAD-915F-25A3D4E3A735}
@@ -799,7 +797,6 @@ next:;
             var previousRow = stackalloc int[(wordLength + max + 1) * stripeWidth];
 
             // We're skipping the left-most column from the original algorithm. It's just a constant so ignore it.
-            // Assigned here: {0FB913DD-0461-4DAF-8C97-ECDE0A9880AD}
             for (var x = 0; x <= max; ++x)
             {
                 previousRow[x] = x + 1;
@@ -816,13 +813,15 @@ next:;
             var currentRow = previousRow + stripeWidth;
             var builderDepth = 0;
 
-            void SearchV6(int skipOriginal)
+            void MatchCharacter(int skipOriginal)
             {
                 var skip = skipOriginal;
                 // We can skip part of the stripe if it's value is larger than maxEdits.
                 var j = skip;
 
-                //This is the value for the column directly before our diagonal stripe. See: {0FB913DD-0461-4DAF-8C97-ECDE0A9880AD}
+                // This is the value for the column directly before our diagonal stripe.
+                // It's the one we avoided setting in previousRow earlier.
+                // TODO: would it be faster to access it from memory rather than compute over and over?
                 var currentRowPreviousColumn = builderDepth + skip + 1;
 
                 char previousWordCharacter;
@@ -922,10 +921,10 @@ next:;
                     return;
                 }
 
-                //TODO: can I simplify these checks?
+                // TODO: can I simplify these checks?
                 if (node < 0 && currentRowPreviousColumn <= max && builderDepth + 1 + max >= wordLength)
                 {
-                    //TODO: investigate Tuple.Create vs new Tuple
+                    // TODO: investigate Tuple.Create vs new Tuple
                     results.Add(new SuggestItem(new string(builder, 0, builderDepth + 1), wordCount[GetIndex(builder, builderDepth + 1)]));
                 }
 
@@ -940,7 +939,7 @@ next:;
                 // In addition, we perform this write even when it's not necessary because checking that condition is more expensive.
                 currentRow[j] = currentRowPreviousColumn + 1;
 
-                //TODO: Is it faster to use a temp for this loop and write to skip after? Would save some writes to memory, but probably pretty cheap since it's in L1 already.
+                // TODO: Is it faster to use a temp for this loop and write to skip after? Would save some writes to memory, but probably pretty cheap since it's in L1 already.
                 if (currentRow[skip] > max)
                 {
                     ++skip;
@@ -966,7 +965,7 @@ next:;
                 {
                     builder[builderDepth] = edgeCharacter = characters[i];
                     node = index[i];
-                    SearchV6(skip);
+                    MatchCharacter(skip);
                 }
 
                 // Visual studio might tell you these 3 lines are unnecessary. Don't believe it.
@@ -975,7 +974,7 @@ next:;
                 --builderDepth;
             }
 
-            SearchV6(0);
+            MatchCharacter(0);
         }
 
         [Pure]
@@ -1119,33 +1118,6 @@ nextIteration:;
             return number;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-        private int AssignCounts(int node, char* builder, int builderLength, int reachableCount, Dictionary<string, long> counts)
-        {
-            if (node < 0)
-            {
-                ++reachableCount;
-                var word = new string(builder, 0, builderLength);
-                _wordCounts[reachableCount] = counts[word];
-                node = -node;
-            }
-
-            var i = _firstChildEdgeIndex[node];
-            var last = _firstChildEdgeIndex[node + 1];
-            for (; i < last; ++i)
-            {
-                builder[builderLength] = _edgeCharacter[i];
-                var nextNode = _edgeToNodeIndex[i];
-
-                var childReachable = AssignCounts(nextNode, builder, builderLength + 1, reachableCount, counts);
-                var realReachable = _reachableTerminalNodes[Abs(nextNode)];
-                Debug.Assert(realReachable == childReachable - reachableCount);
-                reachableCount = childReachable;
-            }
-
-            return reachableCount;
-        }
-
         public readonly int Count;
         private readonly int _rootNodeIndex;
         private readonly int _rootFirstChild;
@@ -1162,23 +1134,17 @@ nextIteration:;
         private readonly StringBuilder _builder = new StringBuilder(50);
         private readonly LargePageMemoryChunk _memoryBlock;
 
-        public Dawg(Stream stream)
+        private readonly SingleElementSuggestItemCollection _singleWordResult = new SingleElementSuggestItemCollection();
+        private readonly SuggestItemCollection _resultCollection = new SuggestItemCollection(293);
+        private readonly CompoundSuggestItemCollection _compoundResultCollection;
+
+        private Dawg(int rootNodeIndex, int[] firstChildEdgeIndex, int[] edgeToNodeIndex, char[] edgeCharacter, ushort[] reachableTerminalNodes, long[] wordCounts)
         {
-            if (stream == null)
-            {
-                throw new InvalidOperationException();
-            }
-
-            _rootNodeIndex = stream.Read<int>();
-            var firstChildEdgeIndex = stream.ReadCompressedIntArray();
-            var edgeToNodeIndex = stream.ReadArray<int>();
-            var edgeCharacter = stream.ReadCharArray();
-            var reachableTerminalNodes = stream.ReadCompressedUshortArray();
-            var wordCounts = stream.ReadCompressedLongArray();
-            Count = wordCounts.Length;
-
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
             GC.Collect();
+
+            _rootNodeIndex = rootNodeIndex;
+            Count = wordCounts.Length;
 
             _memoryBlock = LargePageMemoryChunk.Builder()
                 .ReserveAligned(firstChildEdgeIndex)
@@ -1201,7 +1167,7 @@ nextIteration:;
             _rootLastChild = _firstChildEdgeIndex[_rootNodeIndex + 1];
 
             var rootNodeChildCount = _rootLastChild - _rootFirstChild;
-            _listContainer = new CompoundSuggestItemCollection(rootNodeChildCount);
+            _compoundResultCollection = new CompoundSuggestItemCollection(rootNodeChildCount);
             _tasks = new Task[rootNodeChildCount];
 
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
@@ -1210,100 +1176,24 @@ nextIteration:;
             _memoryBlock.Lock();
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-        public Dawg(PartitionedGraphBuilder builder, string path = "")
+        public Dawg(Stream stream) : this(
+            stream.Read<int>(),
+            stream.ReadCompressedIntArray(),
+            stream.ReadArray<int>(),
+            stream.ReadCharArray(),
+            stream.ReadCompressedUshortArray(),
+            stream.ReadCompressedLongArray())
         {
-            var root = builder.Finish();
+        }
 
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
-
-            var edges = builder.EdgeCount;
-            var allNodes = builder.OrderedNodes;
-
-            var edgeToNodeIndex = new int[edges];
-            var edgeCharacter = new char[edges];
-            var firstChildEdgeIndex = new int[allNodes.Count + 1];
-            firstChildEdgeIndex[^1] = edgeToNodeIndex.Length;
-            _rootNodeIndex = root.OrderedId;
-            var reachableTerminalNodes = new ushort[allNodes.Count];
-
-            var edgeIndex = 0;
-            var nodeCount = 0;
-            foreach (var node in allNodes)
-            {
-                var nodeId = node.OrderedId;
-                Debug.Assert(nodeId == nodeCount);
-                ++nodeCount;
-                firstChildEdgeIndex[nodeId] = edgeIndex;
-                reachableTerminalNodes[nodeId] = (ushort)node.ReachableTerminalNodes;
-
-                foreach (var child in node.SortedChildren)
-                {
-                    var terminalModifier = child.Value.IsTerminal ? -1 : 1;
-                    edgeToNodeIndex[edgeIndex] = terminalModifier * child.Value.OrderedId;
-                    edgeCharacter[edgeIndex] = child.Key;
-                    ++edgeIndex;
-                }
-            }
-
-            var wordCounts = new long[builder.WordCount];
-
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
-
-            Count = wordCounts.Length;
-
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
-
-            _memoryBlock = LargePageMemoryChunk.Builder()
-                .ReserveUnaligned(firstChildEdgeIndex)
-                .ReserveUnaligned(edgeToNodeIndex)
-                .ReserveUnaligned(edgeCharacter)
-                .ReserveUnaligned(reachableTerminalNodes)
-                .ReserveUnaligned(wordCounts)
-                .Allocate();
-
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
-
-            _firstChildEdgeIndex = _memoryBlock.CopyArray(firstChildEdgeIndex);
-            _edgeToNodeIndex = _memoryBlock.CopyArray(edgeToNodeIndex);
-            _edgeCharacter = _memoryBlock.CopyArray(edgeCharacter);
-            _reachableTerminalNodes = _memoryBlock.CopyArray(reachableTerminalNodes);
-            _wordCounts = _memoryBlock.CopyArray(wordCounts);
-
-            var stringBuilder = stackalloc char[100];
-            AssignCounts(_rootNodeIndex, stringBuilder, 0, -1, builder.Counts);
-
-            if (!string.IsNullOrEmpty(path))
-            {
-                using var stream = File.OpenWrite(path);
-                if (stream == null)
-                {
-                    throw new InvalidOperationException();
-                }
-
-                stream.Write(_rootNodeIndex);
-                stream.WriteCompressed(firstChildEdgeIndex);
-                stream.Write(edgeToNodeIndex);
-                stream.Write(edgeCharacter);
-                stream.WriteCompressed(reachableTerminalNodes);
-                stream.WriteCompressed(wordCounts);
-            }
-
-            _rootFirstChild = _firstChildEdgeIndex[_rootNodeIndex];
-            _rootLastChild = _firstChildEdgeIndex[_rootNodeIndex + 1];
-
-            var rootNodeChildCount = _rootLastChild - _rootFirstChild;
-            _listContainer = new CompoundSuggestItemCollection(rootNodeChildCount);
-            _tasks = new Task[rootNodeChildCount];
-
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
-
-            _memoryBlock.Lock();
+        public Dawg(CompressedSparseRowGraph compressedSparseRows) : this(
+            compressedSparseRows.RootNodeIndex,
+            compressedSparseRows.FirstChildEdgeIndex,
+            compressedSparseRows.EdgeToNodeIndex,
+            compressedSparseRows.EdgeCharacter,
+            compressedSparseRows.ReachableTerminalNodes,
+            compressedSparseRows.WordCounts)
+        {
         }
 
         public bool Equals(Dawg other)

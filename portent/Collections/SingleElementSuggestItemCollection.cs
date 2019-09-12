@@ -19,6 +19,7 @@ namespace portent
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Update(string term, long count)
         {
+            //TODO: does this even work?
             var thing = _enum.Current;
             thing.Term = term;
             thing.Count = count;

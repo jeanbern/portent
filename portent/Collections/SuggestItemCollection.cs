@@ -42,14 +42,12 @@ namespace portent
 
         public IEnumerator<SuggestItem> GetEnumerator()
         {
-            //return ((IEnumerable<SuggestItem>)Items).GetEnumerator();
             _myEnumerator.Reset();
             return _myEnumerator;
         }
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            //return ((IEnumerable<SuggestItem>)Items).GetEnumerator();
             _myEnumerator.Reset();
             return _myEnumerator;
         }

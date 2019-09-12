@@ -13,8 +13,7 @@ namespace portent
         public readonly SuggestItemCollection[] Bags;
         public readonly int BagCount;
 
-        //public int Count => Bags.Aggregate(0, (i, list) => i + list.Count);
-
+        // TODO: This is only for the test data. Should revert to auto-increasing lists.
         private static readonly int[] SublistCounts = new int[] { 6441, 5719, 4718, 5031, 5778, 4072, 5311, 4011, 3801, 3730, 3357, 4469, 5018, 3325, 3897, 3414, 2240, 2938, 2627, 2260, 1764, 2466, 728, 754, 1000, 615, 24, 23, 13, 18, 7, 3, 17, 10, 12, 10, 4, 10, 7, 10, 6, 3, 9, 8, 4, 7, 5, 3, 6, 2, 2, 2, 7, 4, 3, 4, 3, 3, 2, 2, 2, 3, 3, 2, 0, 2, 2, 1, 1, 1, 1, 1, 0, 1, 1 };
 
         public CompoundSuggestItemCollection(int count)
@@ -91,7 +90,7 @@ namespace portent
         }
 #endif
 
-        private unsafe class SuggestItemEnumerator : IEnumerator<SuggestItem>
+        private unsafe sealed class SuggestItemEnumerator : IEnumerator<SuggestItem>
         {
             private readonly CompoundSuggestItemCollection _container;
             private int _containerIndex;
