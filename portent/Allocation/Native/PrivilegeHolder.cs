@@ -31,10 +31,10 @@ using System.Threading;
 namespace portent
 {
     /// <summary>
-    ///
+    /// Disposable class to manage the lifetime of a token privilege.
     /// </summary>
     /// <see cref="https://github.com/dotnet/corefx/blob/master/src/System.Security.AccessControl/src/System/Security/AccessControl/Privilege.cs"/>
-    internal class PrivilegeHolder : IDisposable
+    internal sealed class PrivilegeHolder : IDisposable
     {
         private static Luid LuidFromPrivilege(string privilege, out bool success)
         {
@@ -272,9 +272,68 @@ namespace portent
 
         private static class NativeMethods
         {
+            /// <summary>
+            /// The LookupPrivilegeValue function retrieves the locally unique identifier (LUID) used on a specified system to locally represent the specified privilege name.
+            /// </summary>
+            /// <param name="lpSystemName">
+            /// A pointer to a null-terminated string that specifies the name of the system on which the privilege name is retrieved.
+            /// If a null string is specified, the function attempts to find the privilege name on the local system.
+            /// </param>
+            /// <param name="lpName">
+            /// A pointer to a null-terminated string that specifies the name of the privilege, as defined in the Winnt.h header file.
+            /// For example, this parameter could specify the constant, SE_SECURITY_NAME, or its corresponding string, "SeSecurityPrivilege".
+            /// </param>
+            /// <param name="lpLuid">
+            /// A pointer to a variable that receives the LUID by which the privilege is known on the system specified by the lpSystemName parameter.
+            /// </param>
+            /// <returns>
+            /// If the function succeeds, the function returns nonzero.
+            /// If the function fails, it returns zero. To get extended error information, call GetLastError.
+            /// </returns>
+            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-lookupprivilegevaluea"/>
             [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true, BestFitMapping = false, EntryPoint = "LookupPrivilegeValueW")]
             internal static extern bool LookupPrivilegeValue([MarshalAs(UnmanagedType.LPTStr)] string? lpSystemName, [MarshalAs(UnmanagedType.LPTStr)] string lpName, out Luid lpLuid);
 
+            // TODO: Consumers should use a retry mechanism if the buffer supplied was too small.
+            /// <summary>
+            /// The AdjustTokenPrivileges function enables or disables privileges in the specified access token.
+            /// Enabling or disabling privileges in an access token requires TOKEN_ADJUST_PRIVILEGES access.
+            /// </summary>
+            /// <param name="tokenHandle">
+            /// A handle to the access token that contains the privileges to be modified.
+            /// The handle must have TOKEN_ADJUST_PRIVILEGES access to the token.
+            /// If the PreviousState parameter is not NULL, the handle must also have TOKEN_QUERY access.
+            /// </param>
+            /// <param name="disableAllPrivileges">
+            /// Specifies whether the function disables all of the token's privileges.
+            /// If this value is TRUE, the function disables all privileges and ignores the NewState parameter.
+            /// If it is FALSE, the function modifies privileges based on the information pointed to by the NewState parameter.
+            /// </param>
+            /// <param name="newState">
+            /// A pointer to a TOKEN_PRIVILEGES structure that specifies an array of privileges and their attributes.
+            /// If the DisableAllPrivileges parameter is FALSE, the AdjustTokenPrivileges function enables, disables, or removes these privileges for the token.
+            /// If DisableAllPrivileges is TRUE, the function ignores this parameter.
+            /// </param>
+            /// <param name="bufferLength">
+            /// Specifies the size, in bytes, of the buffer pointed to by the PreviousState parameter. This parameter can be zero if the PreviousState parameter is NULL.
+            /// </param>
+            /// <param name="previousState">
+            /// A pointer to a buffer that the function fills with a TOKEN_PRIVILEGES structure that contains the previous state of any privileges that the function modifies.
+            /// That is, if a privilege has been modified by this function, the privilege and its previous state are contained in the TOKEN_PRIVILEGES structure referenced by PreviousState.
+            /// If the PrivilegeCount member of TOKEN_PRIVILEGES is zero, then no privileges have been changed by this function.
+            /// This parameter can be NULL.
+            /// If you specify a buffer that is too small to receive the complete list of modified privileges, the function fails and does not adjust any privileges.
+            /// In this case, the function sets the variable pointed to by the ReturnLength parameter to the number of bytes required to hold the complete list of modified privileges.
+            /// </param>
+            /// <param name="returnLength">
+            /// A pointer to a variable that receives the required size, in bytes, of the buffer pointed to by the PreviousState parameter.
+            /// This parameter can be NULL if PreviousState is NULL.
+            /// </param>
+            /// <returns>
+            /// If the function succeeds, the return value is nonzero.
+            /// To determine whether the function adjusted all of the specified privileges, call GetLastError.
+            /// </returns>
+            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-adjusttokenprivileges"/>
             [DllImport("advapi32.dll", SetLastError = true)]
             internal static extern bool AdjustTokenPrivileges(
                 SafeTokenHandle tokenHandle,
@@ -284,6 +343,40 @@ namespace portent
                 out TokenPrivilege previousState,
                 out uint returnLength);
 
+            /// <summary>
+            /// The GetTokenInformation function retrieves a specified type of information about an access token.
+            /// The calling process must have appropriate access rights to obtain the information.
+            /// To determine if a user is a member of a specific group, use the CheckTokenMembership function.
+            /// To determine group membership for app container tokens, use the CheckTokenMembershipEx function.
+            /// </summary>
+            /// <param name="tokenHandle">
+            /// A handle to an access token from which information is retrieved.
+            /// If TokenInformationClass specifies TokenSource, the handle must have TOKEN_QUERY_SOURCE access.
+            /// For all other TokenInformationClass values, the handle must have TOKEN_QUERY access.
+            /// </param>
+            /// <param name="tokenInformationClass">
+            /// Specifies a value from the TOKEN_INFORMATION_CLASS enumerated type to identify the type of information the function retrieves.
+            /// Any callers who check the TokenIsAppContainer and have it return 0 should also verify that the caller token is not an identify level impersonation token.
+            /// If the current token is not an app container but is an identity level token, you should return AccessDenied.
+            /// </param>
+            /// <param name="tokenInformation">
+            /// A pointer to a buffer the function fills with the requested information.
+            /// The structure put into this buffer depends upon the type of information specified by the TokenInformationClass parameter.
+            /// </param>
+            /// <param name="tokenInformationLength">
+            /// Specifies the size, in bytes, of the buffer pointed to by the TokenInformation parameter.
+            /// If TokenInformation is NULL, this parameter must be zero.
+            /// </param>
+            /// <param name="returnLength">
+            /// A pointer to a variable that receives the number of bytes needed for the buffer pointed to by the TokenInformation parameter.
+            /// If this value is larger than the value specified in the TokenInformationLength parameter, the function fails and stores no data in the buffer.
+            /// If the value of the TokenInformationClass parameter is TokenDefaultDacl and the token has no default DACL, the function sets the variable pointed to by ReturnLength to sizeof(TOKEN_DEFAULT_DACL) and sets the DefaultDacl member of the TOKEN_DEFAULT_DACL structure to NULL.
+            /// </param>
+            /// <returns>
+            /// If the function succeeds, the return value is nonzero.
+            /// If the function fails, the return value is zero. To get extended error information, call GetLastError.
+            /// </returns>
+            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-gettokeninformation"/>
             [DllImport("advapi32.dll", SetLastError = true)]
             internal static extern bool GetTokenInformation(
                 SafeTokenHandle tokenHandle,
@@ -292,6 +385,18 @@ namespace portent
                 uint tokenInformationLength,
                 out uint returnLength);
 
+            /// <summary>
+            /// Checks whether an access token has a given privilege.
+            /// </summary>
+            /// <param name="tokenHandle">
+            /// A handle to an access token from which information is retrieved.
+            /// </param>
+            /// <param name="privilegeLuid">
+            /// The privilege for which to check.
+            /// </param>
+            /// <returns>
+            /// Whether or not the privilege is defined on the access token.
+            /// </returns>
             internal static unsafe bool HasPrivilege(SafeTokenHandle tokenHandle, Luid privilegeLuid)
             {
                 var tokenInformation = new FakeTokenPrivileges(1);

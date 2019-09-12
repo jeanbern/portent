@@ -271,6 +271,38 @@ namespace portent
             [DllImport("kernel32.dll", EntryPoint = "VirtualAlloc", SetLastError = true)]
             private static extern IntPtr VirtualAllocInterop(IntPtr lpAddress, IntPtr dwSize, MemoryAllocationType flAllocationType, MemoryProtectionConstants flProtect);
 
+            /// <summary>
+            /// Reserves, commits, or changes the state of a region of pages in the virtual address space of the calling process.
+            /// Memory allocated by this function is automatically initialized to zero.
+            /// </summary>
+            /// <param name="lpAddress" type="LPVOID">
+            /// The starting address of the region to allocate.
+            /// If the memory is being reserved, the specified address is rounded down to the nearest multiple of the allocation granularity.
+            /// If the memory is already reserved and is being committed, the address is rounded down to the next page boundary.
+            /// To determine the size of a page and the allocation granularity on the host computer, use the GetSystemInfo function.
+            /// If this parameter is NULL, the system determines where to allocate the region.
+            /// </param>
+            /// <param name="dwSize">
+            /// The size of the region, in bytes.
+            /// If the lpAddress parameter is NULL, this value is rounded up to the next page boundary.
+            /// Otherwise, the allocated pages include all pages containing one or more bytes in the range from lpAddress to lpAddress+dwSize.
+            /// This means that a 2-byte range straddling a page boundary causes both pages to be included in the allocated region.
+            /// </param>
+            /// <param name="flAllocationType">
+            /// The type of memory allocation.
+            /// </param>
+            /// <param name="flProtect">The memory protection for the region of pages to be allocated.
+            /// If the pages are being committed, you can specify any one of the memory protection constants.
+            /// If lpAddress specifies an address within an enclave, flProtect cannot be any of the following values:
+            ///     PAGE_NOACCESS
+            ///     PAGE_GUARD
+            ///     PAGE_NOCACHE
+            ///     PAGE_WRITECOMBINE
+            /// </param>
+            /// <returns>
+            /// If the function succeeds, the return value is the base address of the allocated region of pages.
+            /// If the function fails, the return value is NULL.To get extended error information, call GetLastError.
+            /// </returns>
             public static IntPtr VirtualAlloc(IntPtr lpAddress, IntPtr dwSize, MemoryAllocationType flAllocationType, MemoryProtectionConstants flProtect)
             {
                 const string flagNotSupported = "Flag not supported by the VirtualAlloc or VirtualAllocEx functions: ";
@@ -342,6 +374,29 @@ namespace portent
             [DllImport("kernel32.dll", EntryPoint = "VirtualFree", SetLastError = true)]
             private static extern bool VirtualFreeInterop(IntPtr lpAddress, IntPtr dwSize, MemoryFreeType dwFreeType);
 
+            /// <summary>
+            /// Releases, decommits, or releases and decommits a region of pages within the virtual address space of the calling process.
+            /// </summary>
+            /// <param name="lpAddress">
+            /// A pointer to the base address of the region of pages to be freed.
+            /// If the dwFreeType parameter is MEM_RELEASE, this parameter must be the base address returned by the VirtualAlloc function when the region of pages is reserved.
+            /// </param>
+            /// <param name="dwSize">
+            /// The size of the region of memory to be freed, in bytes.
+            /// If the dwFreeType parameter is MEM_RELEASE, this parameter must be 0 (zero).
+            /// The function frees the entire region that is reserved in the initial allocation call to VirtualAlloc.
+            /// If the dwFreeType parameter is MEM_DECOMMIT, the function decommits all memory pages that contain one or more bytes in the range from the lpAddress parameter to (lpAddress+dwSize).
+            /// This means, for example, that a 2-byte region of memory that straddles a page boundary causes both pages to be decommitted.
+            /// If lpAddress is the base address returned by VirtualAlloc and dwSize is 0 (zero), the function decommits the entire region that is allocated by VirtualAlloc.
+            /// After that, the entire region is in the reserved state.
+            /// </param>
+            /// <param name="dwFreeType">
+            /// The type of free operation.
+            /// </param>
+            /// <returns>
+            /// If the function succeeds, the return value is nonzero.
+            /// If the function fails, the return value is 0 (zero). To get extended error information, call GetLastError.
+            /// </returns>
             public static bool VirtualFree(IntPtr lpAddress, IntPtr dwSize, MemoryFreeType dwFreeType)
             {
                 if ((dwFreeType & MemoryFreeType.MemDecommit) != 0 && (dwFreeType & MemoryFreeType.MemRelease) != 0)

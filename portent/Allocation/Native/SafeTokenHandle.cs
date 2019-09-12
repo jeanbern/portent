@@ -30,7 +30,7 @@ using System.Runtime.InteropServices;
 namespace portent
 {
     /// <summary>
-    ///
+    /// Disposable class to manage the lifetime of a thread token handle.
     /// </summary>
     /// <see cref="https://github.com/dotnet/corefx/blob/master/src/System.Security.Principal.Windows/src/Microsoft/Win32/SafeHandles/SafeAccessTokenHandle.cs"/>
     internal sealed class SafeTokenHandle : SafeHandle
@@ -61,6 +61,20 @@ namespace portent
 
         private static class NativeMethods
         {
+            /// <summary>
+            /// Closes an open object handle.
+            /// </summary>
+            /// <param name="handle">
+            /// A valid handle to an open object.
+            /// </param>
+            /// <returns>
+            /// If the function succeeds, the return value is nonzero.
+            /// If the function fails, the return value is zero.
+            /// To get extended error information, call GetLastError.
+            /// If the application is running under a debugger, the function will throw an exception if it receives either a handle value that is not valid or a pseudo-handle value.
+            /// This can happen if you close a handle twice, or if you call CloseHandle on a handle returned by the FindFirstFile function instead of calling the FindClose function.
+            /// </returns>
+            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-closehandle"/>
             [DllImport("kernel32.dll", SetLastError = true)]
             internal static extern bool CloseHandle(IntPtr handle);
         }
