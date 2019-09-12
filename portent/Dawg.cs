@@ -1147,9 +1147,6 @@ nextIteration:;
         private readonly StringBuilder _builder = new StringBuilder(50);
         private readonly LargePageMemoryChunk _memoryBlock;
 
-        private static int HashCode;
-        private readonly int _hashCode;
-
         public Dawg(Stream stream)
         {
             if (stream == null)
@@ -1191,7 +1188,6 @@ nextIteration:;
             var rootNodeChildCount = _rootLastChild - _rootFirstChild;
             _listContainer = new CompoundSuggestItemCollection(rootNodeChildCount);
             _tasks = new Task[rootNodeChildCount];
-            _hashCode = Interlocked.Increment(ref HashCode);
             
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
             GC.Collect();
@@ -1288,7 +1284,6 @@ nextIteration:;
             var rootNodeChildCount = _rootLastChild - _rootFirstChild;
             _listContainer = new CompoundSuggestItemCollection(rootNodeChildCount);
             _tasks = new Task[rootNodeChildCount];
-            _hashCode = Interlocked.Increment(ref HashCode);
 
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
             GC.Collect();
@@ -1320,19 +1315,9 @@ nextIteration:;
             return true;
         }
 
-        public override bool Equals(object? obj)
-        {
-            return obj is Dawg other && Equals(other);
-        }
-
         public void Dispose()
         {
             _memoryBlock.Dispose();
-        }
-
-        public override int GetHashCode()
-        {
-            return _hashCode;
         }
     }
 }

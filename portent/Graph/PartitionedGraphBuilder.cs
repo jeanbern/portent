@@ -80,10 +80,8 @@ namespace portent
 
             Console.WriteLine($"{stopwatch.ElapsedMilliseconds.ToString()} Collecting Nodes");
             CollectNodes();
-            //AssignCounts();
-            //TopologicalSort();
             Console.WriteLine($"{stopwatch.ElapsedMilliseconds.ToString()} Topological Sort");
-            NewTopologicalSort();
+            TopologicalSort();
             Console.WriteLine($"{stopwatch.ElapsedMilliseconds.ToString()} Assigning Ids");
             AssignIds();
             Console.WriteLine($"{stopwatch.ElapsedMilliseconds.ToString()} Graph ready");
@@ -133,167 +131,7 @@ namespace portent
             }
         }
 
-        private void NewTopologicalSort2()
-        {
-            Console.WriteLine("\tBegin Topological sort");
-            var stopwatch = new Stopwatch();
-            stopwatch.Start();
-            var parentMax = 0;
-            Console.WriteLine($"\t{stopwatch.ElapsedMilliseconds.ToString()} Creating Parent + Child Copies");
-            foreach (var node in AllNodes)
-            {
-                if (node.Parents.Count > parentMax)
-                {
-                    parentMax = node.Parents.Count;
-                }
-
-                node.ChildrenCopy = new HashSet<GraphNode>(node.Children.Values);
-                node.ParentCopy = node.Parents.ToArray();
-            }
-
-            Console.WriteLine($"\t{stopwatch.ElapsedMilliseconds.ToString()} Populating parentCounts");
-            var parentCounts = new Dictionary<int, HashSet<GraphNode>>(parentMax + 1);
-            for (var i = 0; i <= parentMax; i++)
-            {
-                parentCounts[i] = new HashSet<GraphNode>();
-
-            }
-
-            Console.WriteLine($"\t{stopwatch.ElapsedMilliseconds.ToString()}");
-            foreach (var node in AllNodes)
-            {
-                parentCounts[node.Parents.Count].Add(node);
-            }
-
-
-            var potentials = parentCounts[0];
-            var window = new Queue<GraphNode>();
-            const int windowSize = 32;
-            var added = 0;
-            var total = AllNodes.Count;
-            OrderedNodes.Capacity = total;
-            var decider = new Dictionary<GraphNode, long>();
-
-            foreach (var node in AllNodes.Where(x => x.IsTerminal).OrderBy(x => x.Count))
-            {
-                added++;
-                Add(node, parentCounts);
-
-                if (window.Count >= windowSize)
-                {
-                    window.Dequeue();
-                }
-
-                window.Enqueue(node);
-                potentials.Remove(node);
-            }
-
-            added++;
-            Add(_root, parentCounts);
-            if (window.Count >= windowSize)
-            {
-                window.Dequeue();
-            }
-
-            window.Enqueue(_root);
-            potentials.Remove(_root);
-
-            Console.WriteLine($"\t{stopwatch.ElapsedMilliseconds.ToString()} Starting Loop");
-            stopwatch.Restart();
-            var innerStopwatch = new Stopwatch();
-            while (added < total)
-            {
-                added++;
-                if (added % 100 == 0)
-                {
-                    Console.WriteLine($"\t{stopwatch.ElapsedMilliseconds.ToString()} Added: {added.ToString()} / {total.ToString()}. Time in inner loops: {innerStopwatch.ElapsedMilliseconds.ToString()}");
-                }
-
-                decider.Clear();
-                Debug.Assert(potentials.Count > 0);
-
-                innerStopwatch.Start();
-                foreach (var current in window)
-                {
-                    foreach (var childEdge in current.ChildEdges.Values)
-                    {
-                        if (!potentials.Contains(childEdge.Target))
-                        {
-                            continue;
-                        }
-
-                        if (decider.TryGetValue(childEdge.Target, out long result))
-                        {
-                            //decider[child] += child.Count;
-                            decider[childEdge.Target] += childEdge.Count;
-                            //decider[child] += 1;
-                        }
-                        else
-                        {
-                            decider.Add(childEdge.Target, childEdge.Count);
-                            //decider.Add(child, 1);
-                        }
-                    }
-
-                    if (current.ParentCopy is null)
-                    {
-                        continue;
-                    }
-
-                    foreach (var parent in current.ParentCopy)
-                    {
-                        foreach (var childEdge in parent.ChildEdges.Values)
-                        {
-                            if (!potentials.Contains(childEdge.Target))
-                            {
-                                continue;
-                            }
-
-                            if (decider.TryGetValue(childEdge.Target, out long result))
-                            {
-                                //decider[child] += child.Count;
-                                decider[childEdge.Target] += childEdge.Count;
-                                //decider[child] += 1;
-                            }
-                            else
-                            {
-                                decider.Add(childEdge.Target, childEdge.Count);
-                                //decider.Add(child, 1);
-                            }
-                        }
-                    }
-                }
-
-                innerStopwatch.Stop();
-
-                var node = potentials.First();
-
-                var max = -1L;
-                foreach (var item in decider)
-                {
-                    if (item.Value > max)
-                    {
-                        max = item.Value;
-                        node = item.Key;
-                    }
-                }
-
-                Add(node, parentCounts);
-
-                if (window.Count >= windowSize)
-                {
-                    window.Dequeue();
-                }
-
-                window.Enqueue(node);
-
-                potentials.Remove(node);
-            }
-
-            Console.WriteLine($"\tTopological Sort complete. Inner loop took {innerStopwatch.ElapsedMilliseconds.ToString()} out of {stopwatch.ElapsedMilliseconds.ToString()} for the outer loop.");
-        }
-
-        private void NewTopologicalSort()
+        private void TopologicalSort()
         {
             Console.WriteLine("\tBegin Topological sort");
             var stopwatch = new Stopwatch();
@@ -427,25 +265,6 @@ namespace portent
             }
 
             Console.WriteLine($"\tTopological Sort complete. Inner loop took {innerStopwatch.ElapsedMilliseconds.ToString()} out of {stopwatch.ElapsedMilliseconds.ToString()} for the outer loop.");
-        }
-
-        private void TopologicalSort()
-        {
-            foreach (var node in AllNodes)
-            {
-                node.Visited = false;
-            }
-
-            OrderedNodes.Capacity = AllNodes.Count;
-            for (var i = 0; i < AllNodes.Count; i++)
-            {
-                if (!AllNodes[i].Visited)
-                {
-                    AllNodes[i].TopologicalSortChildren(OrderedNodes);
-                }
-            }
-
-            OrderedNodes.Reverse();
         }
 
         private void CollectNodes()
