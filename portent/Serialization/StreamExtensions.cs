@@ -592,6 +592,7 @@ namespace JBP
         private static T[] AllocateUninitializedArray<T>(int length)
             where T : unmanaged
         {
+            //TODO: Probably unnecessary because of the unmanaged constraint
             if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
             {
                 return new T[length];
@@ -626,6 +627,7 @@ namespace JBP
 
             private static readonly MethodInfo MethodInfo = GetAllocationMethod().MakeGenericMethod(new Type[] { typeof(T) });
 
+            //TODO: HAHAHAHAHA very hacky indeed
             private static MethodInfo GetAllocationMethod()
             {
                 var t = typeof(GC);

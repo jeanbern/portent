@@ -14,7 +14,7 @@ namespace portent
     /// Sets up appropriate privileges if possible, defaulting to VirtualAlloc without large-pages if necessary.
     /// </remarks>
     /// <see cref="https://docs.microsoft.com/en-us/windows/win32/memory/large-page-support"/>
-    public sealed class LargePageMemoryChunk : IDisposable
+    internal sealed class LargePageMemoryChunk : IDisposable
     {
         private readonly IntPtr _ptr;
         private readonly long _bytesReserved;
@@ -64,10 +64,7 @@ namespace portent
             where T : unmanaged
         {
             var lengthInBytes = Unsafe.SizeOf<T>() * length;
-
-            // The outer % ensures we don't unnecessarily add LargePageMinimum when 0 would do.
-            var necessaryOffset = (PageAlignmentBytes - (((long)_ptr + _offset) % PageAlignmentBytes)) % PageAlignmentBytes;
-            Debug.Assert(((long)_ptr + _offset + necessaryOffset) % PageAlignmentBytes == 0);
+            var necessaryOffset = MemoryAlignmentHelper.RequiredOffset(_ptr, _offset);
 
             lengthInBytes += necessaryOffset;
             Debug.Assert(_offset + lengthInBytes <= _bytesReserved);
@@ -108,10 +105,7 @@ namespace portent
             where T : unmanaged
         {
             var lengthInBytes = (long)Unsafe.SizeOf<T>() * array.Length;
-
-            // The outer % ensures we don't unnecessarily add LargePageMinimum when 0 would do.
-            var necessaryOffset = (PageAlignmentBytes - (((long)_ptr + _offset) % PageAlignmentBytes)) % PageAlignmentBytes;
-            Debug.Assert(((long)_ptr + _offset + necessaryOffset) % PageAlignmentBytes == 0);
+            var necessaryOffset = MemoryAlignmentHelper.RequiredOffset(_ptr, _offset);
 
             Debug.Assert(_offset + lengthInBytes + necessaryOffset <= _bytesReserved);
 
@@ -123,35 +117,11 @@ namespace portent
             return result;
         }
 
-        /// <summary>
-        /// The size in bytes of a processor cache line.
-        /// </summary>
-        public const int L1CacheLineSizeBytes = 64;
-
-        private static UIntPtr LargePageMinimumBacking = UIntPtr.Zero;
-
-        internal static long PageAlignmentBytes => L1CacheLineSizeBytes;
-
-        private static UIntPtr LargePageMinimum
-        {
-            get
-            {
-                if (LargePageMinimumBacking == UIntPtr.Zero)
-                {
-                    LargePageMinimumBacking = NativeMethods.GetLargePageMinimum();
-                }
-
-                return LargePageMinimumBacking;
-            }
-        }
-
         public LargePageMemoryChunk(long length)
         {
             const MemoryAllocationType flags = MemoryAllocationType.MemReserve | MemoryAllocationType.MemCommit;
             const string lockMemory = "SeLockMemoryPrivilege";
-            var requiredMultiples = (int)Math.Ceiling(((double)length) / (double)LargePageMinimum);
-            _bytesReserved = (int)LargePageMinimum * (requiredMultiples + 1);
-            Debug.Assert(_bytesReserved >= length);
+            _bytesReserved = MemoryAlignmentHelper.LargePageMultiple(length);
 
             try
             {
@@ -169,6 +139,7 @@ namespace portent
             catch
             {
                 //It could still fail during disposing of the PrivilegeHolder.
+                //TODO: this is bad
                 _ptr = NativeMethods.VirtualAlloc(IntPtr.Zero, (IntPtr)_bytesReserved, flags, MemoryProtectionConstants.PageReadwrite);
                 Debug.Fail("Can it though?");
             }
@@ -273,20 +244,6 @@ namespace portent
             /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualunlock"/>
             [DllImport("kernel32.dll", SetLastError = true)]
             internal static extern bool VirtualUnlock(IntPtr lpAddress, IntPtr dwSize);
-
-            /// <summary>
-            /// Retrieves the minimum size of a large page.
-            /// </summary>
-            /// <returns>
-            /// If the processor supports large pages, the return value is the minimum size of a large page.
-            /// If the processor does not support large pages, the return value is zero.
-            /// </returns>
-            /// <remarks>
-            /// The minimum large page size varies, but it is typically 2 MB or greater.
-            /// </remarks>
-            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-getlargepageminimum"/>
-            [DllImport("kernel32.dll", SetLastError = true)]
-            internal static extern UIntPtr GetLargePageMinimum();
 
             /// <summary>
             /// Reserves, commits, or changes the state of a region of pages in the virtual address space of the calling process.

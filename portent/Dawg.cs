@@ -7,7 +7,6 @@ using System.Linq;
 using System.Runtime;
 using System.Runtime.CompilerServices;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using JBP;
 using LocalsInit;
@@ -74,7 +73,7 @@ namespace portent
             var tasks = _tasks;
             var rootFirst = _rootFirstChild;
             var rootLast = _rootLastChild;
-            
+
             if (maxEdits == 2)
             {
                 for (var i = rootFirst; i < rootLast; ++i)
@@ -349,44 +348,44 @@ next:;
         private void ParameterizedTaskStartV6Max2(int edge, // Not captured
             char* word, int wordLength, int* toCache)
         {
-            //TODO: test if this is faster captured in the closure or re-calculated every time.
-            // The real stripeWidth is 2*max + 1
+            //TODO: Test most of these locals to see if it's faster to capture or re-calculate them every time.
+
             // Normally we would do a bound check and calculate a value for the cell in previousRow directly after our stripe.
             // Instead we pre-assign the cell when we have the values handy and then ignore bound checking. See: {05054B58-4553-4DAD-915F-25A3D4E3A735}
+            // For this reason, the stripeWidth gets a +1
+            // The real stripeWidth is usually 2*max + 1 = 5
+            //TODO: Testing with 8 for cache boundary divisibility. Shouldn't matter?
             const int stripeWidth = 8;
-            // +2 for maxEdits = 2
-            var editMatrix = stackalloc int[((wordLength + 2) * stripeWidth) + LargePageMemoryChunk.L1CacheLineSizeBytes];
-            editMatrix += LargePageMemoryChunk.L1CacheLineSizeBytes - ((long)editMatrix % LargePageMemoryChunk.L1CacheLineSizeBytes);
 
-            //const int stripeWidth = 6;
-            // +2 for maxEdits = 2
-            //var editMatrix = stackalloc int[(wordLength + 2) * stripeWidth];
+            // +2 for maxEdits = 2, then distribute the multiplication to take advantage of const.
+            // Would be otherwise be: (wordLength + maxEdits)*stripeWidth
+            var matrixLength = MemoryAlignmentHelper.GetCacheAlignedSize<int>((wordLength * stripeWidth) + (2 * stripeWidth));
+            var editMatrixAlloc = stackalloc byte[matrixLength];
 
-            var builder = stackalloc char[wordLength + 2];
+            var builderByteCount = MemoryAlignmentHelper.GetCacheAlignedSize<char>(wordLength + 2);
+            var builderBytes = stackalloc byte[builderByteCount];
 
+            //TODO: If these are captured in a closure anyways, is it faster to just look them up?
             var edgeToNodeIndex = _edgeToNodeIndex;
             var edgeCharacters = _edgeCharacter;
             var edgeIndex = _firstChildEdgeIndex;
             var wordCount = _wordCounts;
             var results = _listContainer.Bags[edge - _rootFirstChild];
-            var row0 = editMatrix;
-            var row1 = editMatrix + stripeWidth;
-            var row2 = editMatrix + (2 * stripeWidth);
-            var row3 = editMatrix + (3 * stripeWidth);
-            var previousRow = row3;
-            var currentRow = row3 + stripeWidth;
 
-            var currentCharacter = builder[0] = edgeCharacters[edge];
-            var node = edgeToNodeIndex[edge];
-            //previousRow += stripeWidth;
+            // These 2 variables are used in all MatchCharacter functions
+            var builder = MemoryAlignmentHelper.GetCacheAlignedStart<char>(builderBytes);
+            var editMatrix = MemoryAlignmentHelper.GetCacheAlignedStart<int>(editMatrixAlloc);
+
+            // These 3 variables, in addition to the 2 later, are used for parameter passing in MatchCharacterX
+            var previousRow = editMatrix + (3 * stripeWidth);
+            var currentRow = previousRow + stripeWidth;
             var builderDepth = 4;
 
-            var to1 = toCache[1];
-            var to2 = toCache[2];
-            var to3 = toCache[3];
-            var to4 = toCache[4];
+            // These two variables are used for parameter passing between MatchCharacter1-3
+            var currentCharacter = builder[0] = edgeCharacters[edge];
+            var node = edgeToNodeIndex[edge];
 
-            void SearchV6(int skipOriginal)
+            void MatchCharacterX(int skipOriginal)
             {
                 var skip = skipOriginal;
                 //This is the value for the column directly before our diagonal stripe. See: {0FB913DD-0461-4DAF-8C97-ECDE0A9880AD}
@@ -486,7 +485,7 @@ next:;
                 {
                     currentCharacter = builder[builderDepth] = edgeCharacters[i];
                     node = edgeToNodeIndex[i];
-                    SearchV6(skip);
+                    MatchCharacterX(skip);
                 }
 
                 builderDepth--;
@@ -494,7 +493,17 @@ next:;
                 previousRow -= stripeWidth;
             }
 
-            void SearchV6Depth3(int skipOriginal)
+            // Some variables are not used in all MatchCharacter functions. Moved them closer to usage.
+            // How do closures work here, does the struct getting passed contain all of them no matter where declared?
+            // Does the deeper struct contain repeated information?
+            // TODO: Consider building a nested struct myself. Nested as in union, not reference or copy.
+            var to4 = toCache[4];
+            var to3 = toCache[3];
+            var row1 = editMatrix + stripeWidth;
+            var row2 = editMatrix + (2 * stripeWidth);
+            var row3 = editMatrix + (3 * stripeWidth);
+
+            void MatchCharacter3(int skipOriginal)
             {
                 var skip = skipOriginal;
                 var currentRowPreviousColumn = 3;
@@ -582,11 +591,14 @@ next:;
                 {
                     currentCharacter = builder[4] = edgeCharacters[i];
                     node = edgeToNodeIndex[i];
-                    SearchV6(skip);
+                    MatchCharacterX(skip);
                 }
             }
 
-            void SearchV6Depth2()
+            var to2 = toCache[2];
+            var row0 = editMatrix;
+
+            void MatchCharacter2()
             {
                 var currentRowPreviousColumn = 3;
                 var previousRowPreviousColumn = 2;
@@ -672,11 +684,13 @@ next:;
                 {
                     currentCharacter = builder[3] = edgeCharacters[i];
                     node = edgeToNodeIndex[i];
-                    SearchV6Depth3(skip);
+                    MatchCharacter3(skip);
                 }
             }
 
-            void SearchV6Depth1()
+            var to1 = toCache[1];
+
+            void MatchCharacter1()
             {
                 var currentRowPreviousColumn = 2;
                 var previousRowPreviousColumn = 1;
@@ -727,11 +741,12 @@ next:;
                 {
                     currentCharacter = builder[2] = edgeCharacters[i];
                     node = edgeToNodeIndex[i];
-                    SearchV6Depth2();
+                    MatchCharacter2();
                 }
             }
 
             var currentRowPreviousColumn = 1;
+            //TODO: unroll this
             var to = Math.Min(3, wordLength);
             for (var j = 0; j < to; ++j)
             {
@@ -760,7 +775,7 @@ next:;
             {
                 currentCharacter = builder[1] = edgeCharacters[i];
                 node = edgeToNodeIndex[i];
-                SearchV6Depth1();
+                MatchCharacter1();
             }
         }
 
@@ -1188,7 +1203,7 @@ nextIteration:;
             var rootNodeChildCount = _rootLastChild - _rootFirstChild;
             _listContainer = new CompoundSuggestItemCollection(rootNodeChildCount);
             _tasks = new Task[rootNodeChildCount];
-            
+
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
             GC.Collect();
 

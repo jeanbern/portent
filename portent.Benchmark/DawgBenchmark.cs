@@ -3,17 +3,37 @@ using System;
 using System.IO;
 using System.Runtime;
 
-namespace portent
+namespace portent.Benchmark
 {
     public class DawgBenchmark : IDisposable
     {
-        private const string SaveLocation = @"../../../../lev7.aug";
-        private const string Query1K = @"../../../../noisy_query_en_1000.txt";
+        // /bin/$(Configuration)/netcore3.0/
+        private const string SaveLocation = "../../../lev7.aug";
+        private const string Query1K = "../../../noisy_query_en_1000.txt";
 
-        private readonly Dawg _dawg = new Dawg(File.OpenRead(SaveLocation));
-        private readonly string[] _words = BuildQuery1K();
+        private readonly Dawg _dawg;
+        private readonly string[] _words;
 
-        public DawgBenchmark()
+        public DawgBenchmark(bool fromBenchmarkRunner)
+        {
+            if (fromBenchmarkRunner)
+            {
+                //Add a another level for the BenchmarkDotNet GUID
+                using var dawgStream = File.OpenRead("../" + SaveLocation);
+                _dawg = new Dawg(dawgStream);
+                using var queryStream = File.OpenRead("../" + Query1K);
+                _words = BuildQuery1K(queryStream);
+            }
+            else
+            {
+                using var dawgStream = File.OpenRead(SaveLocation);
+                _dawg = new Dawg(dawgStream);
+                using var queryStream = File.OpenRead(Query1K);
+                _words = BuildQuery1K(queryStream);
+            }
+        }
+
+        public DawgBenchmark() : this(true)
         {
             if (!VerifyDawgCorrectness())
             {
@@ -21,43 +41,40 @@ namespace portent
             }
         }
 
-        private static string[] BuildQuery1K()
+        private static string[] BuildQuery1K(Stream stream)
         {
             var testList = new string[1000];
             var i = 0;
-            using (var stream = File.OpenRead(Query1K))
+            if (stream == null)
             {
-                if (stream == null)
-                {
-                    throw new InvalidOperationException();
-                }
+                throw new InvalidOperationException();
+            }
 
-                using var reader = new StreamReader(stream);
-                if (reader == null)
-                {
-                    throw new InvalidOperationException();
-                }
+            using var reader = new StreamReader(stream);
+            if (reader == null)
+            {
+                throw new InvalidOperationException();
+            }
 
-                string? line;
-                while ((line = reader.ReadLine()) != null)
+            string? line;
+            while ((line = reader.ReadLine()) != null)
+            {
+                var lineParts = line.Split(null);
+                if (lineParts?.Length == 3)
                 {
-                    var lineParts = line.Split(null);
-                    if (lineParts?.Length == 3)
-                    {
-                        testList[i++] = lineParts[0];
-                    }
+                    testList[i++] = lineParts[0];
                 }
             }
 
             if (i != 1000)
             {
-                throw new InvalidOperationException("Unexpected number of query inputs: " + i);
+                throw new InvalidOperationException("Unexpected number of query inputs: " + i.ToString());
             }
 
             return testList;
         }
 
-        private static Dawg CreateDictionary(string corpusPath, string savePath)
+        public static Dawg CreateDictionary(string corpusPath, string savePath)
         {
             var biggest = 0L;
 
@@ -96,7 +113,7 @@ namespace portent
         public int MaxErrors { get; set; }
 
         [GlobalSetup]
-        public void SetupDawg()
+        public void SetupForRun()
         {
             GCSettings.LatencyMode = GCLatencyMode.Batch;
         }
