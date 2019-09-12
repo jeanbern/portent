@@ -7,7 +7,6 @@ namespace portent.Test
         [Fact]
         public void Test1()
         {
-            Assert.Equal(4, FakeClass.TestMe());
         }
     }
 }
