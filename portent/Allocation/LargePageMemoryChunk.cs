@@ -123,25 +123,15 @@ namespace portent
             const string lockMemory = "SeLockMemoryPrivilege";
             _bytesReserved = MemoryAlignmentHelper.LargePageMultiple(length);
 
-            try
+            using var privs = PrivilegeHolder.EnablePrivilege(lockMemory);
+            if (privs != null)
             {
-                using var privs = new PrivilegeHolder(lockMemory, out var success);
                 const MemoryAllocationType largeFlag = flags | MemoryAllocationType.MemLargePages;
-                if (success)
-                {
-                    _ptr = NativeMethods.VirtualAlloc(IntPtr.Zero, (IntPtr)_bytesReserved, largeFlag, MemoryProtectionConstants.PageReadwrite);
-                }
-                else
-                {
-                    _ptr = NativeMethods.VirtualAlloc(IntPtr.Zero, (IntPtr)_bytesReserved, flags, MemoryProtectionConstants.PageReadwrite);
-                }
+                _ptr = NativeMethods.VirtualAlloc(IntPtr.Zero, (IntPtr)_bytesReserved, largeFlag, MemoryProtectionConstants.PageReadwrite);
             }
-            catch
+            else
             {
-                //It could still fail during disposing of the PrivilegeHolder.
-                //TODO: this is bad
                 _ptr = NativeMethods.VirtualAlloc(IntPtr.Zero, (IntPtr)_bytesReserved, flags, MemoryProtectionConstants.PageReadwrite);
-                Debug.Fail("Can it though?");
             }
         }
 

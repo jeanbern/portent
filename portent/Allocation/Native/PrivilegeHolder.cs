@@ -31,7 +31,7 @@ using System.Threading;
 namespace portent
 {
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <see cref="https://github.com/dotnet/corefx/blob/master/src/System.Security.AccessControl/src/System/Security/AccessControl/Privilege.cs"/>
     internal class PrivilegeHolder : IDisposable
@@ -52,20 +52,66 @@ namespace portent
         private bool _needToRevert;
         private bool _initialState;
         private bool _stateWasChanged;
-        private Luid _luid;
+        private readonly Luid _luid;
         private readonly Thread _currentThread = Thread.CurrentThread;
-        private readonly TlsContents? _tlsContents;
+        private readonly TlsContents _tlsContents;
 
-        public PrivilegeHolder(string privilegeName, out bool success)
+        private bool ObtainPrivilege()
         {
-            var error = 0;
-            _luid = LuidFromPrivilege(privilegeName, out var luidSuccess);
-            if (!luidSuccess)
+            // Check if we have the privilege, this is different than having it enabled.
+            if (!NativeMethods.HasPrivilege(_tlsContents.ThreadHandle, _luid))
             {
-                success = false;
-                return;
+                Reset();
+                return false;
+                // Nothing else gets run. We return.
             }
 
+            TokenPrivilege newState;
+            newState.PrivilegeCount = 1;
+            newState.Privileges.Luid = _luid;
+            newState.Privileges.Attributes = SePrivilegeAttributes.SePrivilegeEnabled;
+
+            TokenPrivilege previousState;
+
+            // Place the new privilege on the thread token and remember the previous state.
+            if (!NativeMethods.AdjustTokenPrivileges(
+                _tlsContents.ThreadHandle,
+                false,
+                ref newState,
+                TokenPrivilege.SizeOf,
+                out previousState,
+                out _))
+            {
+                return Marshal.GetLastWin32Error() == 0;
+            }
+
+            const int errorNotAllAssigned = 0x514;
+            if (errorNotAllAssigned == Marshal.GetLastWin32Error())
+            {
+                return false;
+            }
+
+            // This is the initial state that revert will have to go back to
+            _initialState = (previousState.Privileges.Attributes & SePrivilegeAttributes.SePrivilegeEnabled) != 0;
+
+            // Remember whether state has changed at all (in this case, only changed if it was NOT set previously)
+            _stateWasChanged = !_initialState;
+
+            // If we had to impersonate, or if the privilege state changed we'll need to revert
+            _needToRevert = _tlsContents.IsImpersonating || _stateWasChanged;
+            return true;
+        }
+
+        public static PrivilegeHolder? EnablePrivilege(string privilegeName)
+        {
+            var luid = LuidFromPrivilege(privilegeName, out var luidSuccess);
+            if (!luidSuccess)
+            {
+                return null;
+            }
+
+            PrivilegeHolder? holder = null;
+            var success = false;
             try
             {
                 // The payload is entirely in the finally block
@@ -77,75 +123,47 @@ namespace portent
                 try
                 {
                     // Retrieve TLS state
-                    _tlsContents = TtlsSlotData;
-
+                    var _tlsContents = TtlsSlotData;
                     if (_tlsContents == null)
                     {
-                        _tlsContents = new TlsContents(out success);
-                        TtlsSlotData = _tlsContents;
+                        TtlsSlotData = _tlsContents = TlsContents.Create();
                     }
                     else
                     {
-                        success = true;
                         _tlsContents.IncrementReferenceCount();
                     }
 
-                    // Check if we have the privilege, this is different than having it enabled.
-                    if (success && NativeMethods.HasPrivilege(_tlsContents.ThreadHandle, _luid))
+                    if (_tlsContents != null)
                     {
-                        const int errorNotAllAssigned = 0x514;
-
-                        TokenPrivilege newState;
-                        newState.PrivilegeCount = 1;
-                        newState.Privileges.Luid = _luid;
-                        newState.Privileges.Attributes = SePrivilegeAttributes.SePrivilegeEnabled;
-
-                        var previousState = new TokenPrivilege();
-
-                        // Place the new privilege on the thread token and remember the previous state.
-                        if (!NativeMethods.AdjustTokenPrivileges(
-                            _tlsContents.ThreadHandle,
-                            false,
-                            ref newState,
-                            TokenPrivilege.SizeOf,
-                            out previousState,
-                            out _))
+                        holder = new PrivilegeHolder(_tlsContents, luid);
+                        if (holder.ObtainPrivilege())
                         {
-                            error = Marshal.GetLastWin32Error();
+                            success = true;
                         }
-                        else if (errorNotAllAssigned == Marshal.GetLastWin32Error())
-                        {
-                            error = errorNotAllAssigned;
-                        }
-                        else
-                        {
-                            // This is the initial state that revert will have to go back to
-                            _initialState = (previousState.Privileges.Attributes & SePrivilegeAttributes.SePrivilegeEnabled) != 0;
-
-                            // Remember whether state has changed at all
-                            _stateWasChanged = true;
-
-                            // If we had to impersonate, or if the privilege state changed we'll need to revert
-                            _needToRevert = _tlsContents.IsImpersonating || _stateWasChanged;
-                        }
-                    }
-                    else
-                    {
-                        Reset();
-                        error = 0x5;
-                        // Nothing else gets run. We return.
                     }
                 }
                 finally
                 {
-                    if (!_needToRevert)
+                    if (holder?._needToRevert == false)
                     {
-                        Reset();
+                        holder.Reset();
+                    }
+
+                    if (!success)
+                    {
+                        holder?.Dispose();
+                        holder = null;
                     }
                 }
             }
 
-            success = error == 0;
+            return holder;
+        }
+
+        private PrivilegeHolder(TlsContents contents, Luid luid)
+        {
+            _tlsContents = contents;
+            _luid = luid;
         }
 
         private void Reset()

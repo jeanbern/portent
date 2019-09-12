@@ -25,50 +25,98 @@ SOFTWARE.
 */
 
 using System;
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace portent
 {
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <see cref="https://github.com/dotnet/corefx/blob/master/src/System.Security.AccessControl/src/System/Security/AccessControl/Privilege.cs"/>
     internal sealed class TlsContents : IDisposable
     {
-        private readonly SafeTokenHandle _threadHandle = new SafeTokenHandle(IntPtr.Zero);
+        private SafeTokenHandle _threadHandle = new SafeTokenHandle(IntPtr.Zero);
         private static volatile SafeTokenHandle ProcessHandle = new SafeTokenHandle(IntPtr.Zero);
         private static readonly object SyncRoot = new object();
 
         public int ReferenceCountValue { get; private set; } = 1;
         public SafeTokenHandle ThreadHandle => _threadHandle;
-        public bool IsImpersonating { get; }
+        public bool IsImpersonating { get; private set; }
 
-        public TlsContents(out bool success)
+        private bool OpenThreadToken()
         {
-            int error = 0;
-            int cachingError = 0;
+            //
+            // Open the thread token; if there is no thread token, get one from
+            // the process token by impersonating self.
+            //
 
-            success = true;
+            SafeTokenHandle threadHandleBefore = _threadHandle;
+            var error = NativeMethods.OpenThreadToken(
+                          TokenAccessLevels.Query | TokenAccessLevels.AdjustPrivileges,
+                          WinSecurityContext.Process,
+                          out _threadHandle);
+
+            unchecked { error &= ~(int)0x80070000; }
+
+            if (error == 0)
+            {
+                return true;
+            }
+
+            _threadHandle = threadHandleBefore;
+
+            const int errorNoToken = 0x3f0;
+            if (error != errorNoToken)
+            {
+                return false;
+            }
+
+            if (!NativeMethods.DuplicateTokenEx(
+                            ProcessHandle,
+                            TokenAccessLevels.Impersonate | TokenAccessLevels.Query | TokenAccessLevels.AdjustPrivileges,
+                            IntPtr.Zero,
+                            SecurityImpersonationLevel.SecurityImpersonation,
+                            TokenType.TokenImpersonation,
+                            ref _threadHandle))
+            {
+                return false;
+            }
+
+            error = NativeMethods.SetThreadToken(_threadHandle);
+            unchecked { error &= ~(int)0x80070000; }
+
+            if (error != 0)
+            {
+                return false;
+            }
+
+            IsImpersonating = true;
+            return true;
+        }
+
+        private TlsContents()
+        {
+
+        }
+
+        public static TlsContents? Create()
+        {
             if (ProcessHandle.IsInvalid)
             {
                 lock (SyncRoot)
                 {
-                    if (ProcessHandle.IsInvalid)
-                    {
-                        if (!NativeMethods.OpenProcessToken(
+                    if (ProcessHandle.IsInvalid && NativeMethods.OpenProcessToken(
                                         NativeMethods.GetCurrentProcess(),
                                         TokenAccessLevels.Duplicate,
                                         out SafeTokenHandle localProcessHandle))
-                        {
-                            cachingError = Marshal.GetLastWin32Error();
-                            success = false;
-                        }
+                    {
                         ProcessHandle = localProcessHandle;
                     }
                 }
             }
 
+            var success = true;
+            TlsContents? result = new TlsContents();
             try
             {
                 // Make the sequence non-interruptible
@@ -77,87 +125,19 @@ namespace portent
             {
                 try
                 {
-                    //
-                    // Open the thread token; if there is no thread token, get one from
-                    // the process token by impersonating self.
-                    //
-
-                    SafeTokenHandle threadHandleBefore = _threadHandle;
-                    error = NativeMethods.OpenThreadToken(
-                                  TokenAccessLevels.Query | TokenAccessLevels.AdjustPrivileges,
-                                  WinSecurityContext.Process,
-                                  out _threadHandle);
-                    unchecked { error &= ~(int)0x80070000; }
-
-                    if (error != 0)
-                    {
-                        if (success)
-                        {
-                            _threadHandle = threadHandleBefore;
-
-                            const int errorNoToken = 0x3f0;
-                            if (error != errorNoToken)
-                            {
-                                success = false;
-                            }
-
-                            Debug.Assert(!IsImpersonating, "Incorrect isImpersonating state");
-
-                            if (success)
-                            {
-                                error = 0;
-                                if (!NativeMethods.DuplicateTokenEx(
-                                                ProcessHandle,
-                                                TokenAccessLevels.Impersonate | TokenAccessLevels.Query | TokenAccessLevels.AdjustPrivileges,
-                                                IntPtr.Zero,
-                                                SecurityImpersonationLevel.SecurityImpersonation,
-                                                TokenType.TokenImpersonation,
-                                                ref _threadHandle))
-                                {
-                                    error = Marshal.GetLastWin32Error();
-                                    success = false;
-                                }
-                            }
-
-                            if (success)
-                            {
-                                error = NativeMethods.SetThreadToken(_threadHandle);
-                                unchecked { error &= ~(int)0x80070000; }
-
-                                if (error != 0)
-                                {
-                                    success = false;
-                                }
-                            }
-
-                            if (success)
-                            {
-                                IsImpersonating = true;
-                            }
-                        }
-                        else
-                        {
-                            error = cachingError;
-                        }
-                    }
-                    else
-                    {
-                        success = true;
-                    }
+                    success = result.OpenThreadToken();
                 }
                 finally
                 {
                     if (!success)
                     {
-                        Dispose();
+                        result.Dispose();
+                        result = null;
                     }
                 }
             }
 
-            if (error != 0)
-            {
-                success = false;
-            }
+            return result;
         }
 
         private bool _disposed;
@@ -234,7 +214,7 @@ namespace portent
             internal static extern bool OpenThreadToken(IntPtr threadHandle, TokenAccessLevels dwDesiredAccess, bool bOpenAsSelf, out SafeTokenHandle phThreadToken);
 
             /// <summary>
-            /// 
+            ///
             /// </summary>
             /// <see cref="https://github.com/dotnet/corefx/blob/master/src/System.Security.AccessControl/src/System/Security/Principal/Win32.cs"/>
             internal static int OpenThreadToken(TokenAccessLevels dwDesiredAccess, WinSecurityContext dwOpenAs, out SafeTokenHandle phThreadToken)

@@ -30,7 +30,7 @@ using System.Runtime.InteropServices;
 namespace portent
 {
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <see cref="https://github.com/dotnet/corefx/blob/master/src/System.Security.Principal.Windows/src/Microsoft/Win32/SafeHandles/SafeAccessTokenHandle.cs"/>
     internal sealed class SafeTokenHandle : SafeHandle
@@ -51,7 +51,7 @@ namespace portent
         public override bool IsInvalid
         {
             get
-            { return handle == new IntPtr(0) || handle == new IntPtr(-1); }
+            { return handle == IntPtr.Zero || handle == new IntPtr(-1); }
         }
 
         protected override bool ReleaseHandle()
