@@ -68,7 +68,7 @@ namespace portent
         /// TODO: Maybe figure it out at runtime as a static readonly instead?
         public const int L1CacheLineSizeBytes = 64;
 
-        public static UIntPtr LargePageMinimumBacking = UIntPtr.Zero;
+        private static UIntPtr _largePageMinimumBacking = UIntPtr.Zero;
 
         public static long PageAlignmentBytes => L1CacheLineSizeBytes;
 
@@ -76,12 +76,12 @@ namespace portent
         {
             get
             {
-                if (LargePageMinimumBacking == UIntPtr.Zero)
+                if (_largePageMinimumBacking == UIntPtr.Zero)
                 {
-                    LargePageMinimumBacking = NativeMethods.GetLargePageMinimum();
+                    _largePageMinimumBacking = NativeMethods.GetLargePageMinimum();
                 }
 
-                return LargePageMinimumBacking;
+                return _largePageMinimumBacking;
             }
         }
 

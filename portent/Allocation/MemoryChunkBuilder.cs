@@ -40,7 +40,7 @@ namespace portent
             return this;
         }
 
-        public unsafe LargePageMemoryChunk Allocate()
+        public LargePageMemoryChunk Allocate()
         {
             return new LargePageMemoryChunk(_count);
         }

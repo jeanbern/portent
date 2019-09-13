@@ -5,7 +5,7 @@
 
 A highly optimized C# implementation of fuzzy word matching with a Directed Acyclic Word Graph.  
 
-For background, visit my blog: https://jbp.dev/blog/dawg-basics.html  
+For background, visit my blog: <https://jbp.dev/blog/dawg-basics.html>  
 Eventually there will be a host of content explaining the design decisions involved in creating the Dawg class.
 1. Performance enhancements in `Lookup()`
 2. Memory management in the `Dawg()` constructor

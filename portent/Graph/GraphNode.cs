@@ -11,14 +11,16 @@ namespace portent
         /// This contains the children. It is not modified.
         /// </summary>
         public Dictionary<char, GraphNode> Children { get; } = new Dictionary<char, GraphNode>();
+
         /// <summary>
         /// This can contain a copy of Children. It is assigned during Topological Ordering and the elements are removed one by one.
         /// </summary>
         public HashSet<GraphNode>? ChildrenCopy;
+
         /// <summary>
         /// This will be equivalent to Children. It should contain more accurate Count information: tracked at the edge level instead of by node.
         /// </summary>
-        public Dictionary<char, GraphEdge> ChildEdges = new Dictionary<char, GraphEdge>();
+        public readonly Dictionary<char, GraphEdge> ChildEdges = new Dictionary<char, GraphEdge>();
 
         public void RecursiveAddEdgeCount(long count)
         {

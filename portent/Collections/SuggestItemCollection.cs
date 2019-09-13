@@ -4,7 +4,7 @@ using System.Collections.Generic;
 
 namespace portent
 {
-    public sealed unsafe class SuggestItemCollection : IEnumerable<SuggestItem>
+    internal sealed class SuggestItemCollection : IEnumerable<SuggestItem>, IDisposable
     {
         public SuggestItemCollection(int count)
         {
@@ -15,11 +15,11 @@ namespace portent
         }
 
 #if DEBUG
-        public SuggestItem[] Items;
-        public int Capacity;
+        internal SuggestItem[] Items;
+        internal int Capacity;
 #else
-        public readonly SuggestItem[] Items;
-        public readonly int Capacity;
+        internal readonly SuggestItem[] Items;
+        private readonly int Capacity;
 #endif
         public void Add(SuggestItem item)
         {
@@ -50,6 +50,11 @@ namespace portent
         {
             _myEnumerator.Reset();
             return _myEnumerator;
+        }
+
+        public void Dispose()
+        {
+            _myEnumerator.Dispose();
         }
 
         public int Count { get; private set; }

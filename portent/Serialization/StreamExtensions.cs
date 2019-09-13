@@ -334,24 +334,6 @@ namespace JBP
             } while ((b & 0x80) != 0);
         }
 
-        /*
-        long bufferSizeInBytes = (long)size * sizeof(int);
-        if (bufferSizeInBytes < _bulkReadThresholdInBytes)
-        {
-            for (int i = 0; i < size; i++)
-                values[i] = reader.ReadInt32();
-        }
-        else
-        {
-            unsafe
-            {
-                fixed (void* dst = values)
-                {
-                    ReadBytes(reader, dst, bufferSizeInBytes, bufferSizeInBytes);
-                }
-            }
-        }*/
-
         public static ushort[] ReadCompressedUshortArray(this Stream stream)
         {
             var count = stream.ReadCompressedInt();
@@ -483,7 +465,6 @@ namespace JBP
                 if (size == sizeof(long))
                 {
                     //TODO: shortcut to reading directly into memory.
-                    //TODO: continue;
                 }
 
                 var length = stream.ReadCompressedInt();

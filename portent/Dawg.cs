@@ -786,7 +786,7 @@ next:;
             var characters = _edgeCharacter;
             var edgeIndex = _firstChildEdgeIndex;
             var wordCount = _wordCounts;
-            var results = _compoundResultCollection.Bags[edge % _compoundResultCollection.BagCount];
+            var results = _compoundResultCollection.Bags[edge - _rootFirstChild];
 
             // TODO: test if this is faster captured in the closure or re-calculated every time.
             // The real stripeWidth is 2*max + 1

@@ -11,7 +11,7 @@ namespace portent
     /// The memory region is freed upon disposal of this object.
     /// </summary>
     /// <remarks>
-    /// Sets up appropriate privileges if possible, defaulting to VirtualAlloc without large-pages if necessary.
+    /// Sets up appropriate privileges if possible, defaulting to VirtualAlloc without large-page support if necessary.
     /// </remarks>
     /// <see cref="https://docs.microsoft.com/en-us/windows/win32/memory/large-page-support"/>
     internal sealed class LargePageMemoryChunk : IDisposable
@@ -19,7 +19,7 @@ namespace portent
         private readonly IntPtr _ptr;
         private readonly long _bytesReserved;
 
-        private long _offset = 0;
+        private long _offset;
         private bool _locked;
 
         public bool Lock()
@@ -128,6 +128,7 @@ namespace portent
             {
                 const MemoryAllocationType largeFlag = flags | MemoryAllocationType.MemLargePages;
                 _ptr = NativeMethods.VirtualAlloc(IntPtr.Zero, (IntPtr)_bytesReserved, largeFlag, MemoryProtectionConstants.PageReadwrite);
+                GC.KeepAlive(privs);
             }
             else
             {

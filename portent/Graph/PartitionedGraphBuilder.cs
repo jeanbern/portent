@@ -77,7 +77,7 @@ namespace portent
         {
             if (WordCount % 5000 == 0)
             {
-                Console.WriteLine($"Insert: {WordCount.ToString()}");
+                Debug.WriteLine($"Insert: {WordCount.ToString()}");
             }
 
             Debug.Assert(string.CompareOrdinal(word, _previousWord) > 0);
@@ -118,19 +118,19 @@ namespace portent
         {
             var stopwatch = new Stopwatch();
             stopwatch.Start();
-            Console.WriteLine($"{stopwatch.ElapsedMilliseconds.ToString()} Finishing up {GetType().Name}");
+            Debug.WriteLine($"{stopwatch.ElapsedMilliseconds.ToString()} Finishing up {GetType().Name}");
             Minimize(0);
             _minimizedNodes.Clear();
-            Console.WriteLine($"{stopwatch.ElapsedMilliseconds.ToString()} Calculating reachable Terminals.");
+            Debug.WriteLine($"{stopwatch.ElapsedMilliseconds.ToString()} Calculating reachable Terminals.");
             _root.CalculateReachableTerminals();
 
-            Console.WriteLine($"{stopwatch.ElapsedMilliseconds.ToString()} Collecting Nodes");
+            Debug.WriteLine($"{stopwatch.ElapsedMilliseconds.ToString()} Collecting Nodes");
             CollectNodes();
-            Console.WriteLine($"{stopwatch.ElapsedMilliseconds.ToString()} Topological Sort");
+            Debug.WriteLine($"{stopwatch.ElapsedMilliseconds.ToString()} Topological Sort");
             TopologicalSort();
-            Console.WriteLine($"{stopwatch.ElapsedMilliseconds.ToString()} Assigning Ids");
+            Debug.WriteLine($"{stopwatch.ElapsedMilliseconds.ToString()} Assigning Ids");
             AssignIds();
-            Console.WriteLine($"{stopwatch.ElapsedMilliseconds.ToString()} Graph ready");
+            Debug.WriteLine($"{stopwatch.ElapsedMilliseconds.ToString()} Graph ready");
 
             return _root;
         }
@@ -182,11 +182,11 @@ namespace portent
 
         private void TopologicalSort()
         {
-            Console.WriteLine("\tBegin Topological sort");
+            Debug.WriteLine("\tBegin Topological sort");
             var stopwatch = new Stopwatch();
             stopwatch.Start();
             var parentMax = 0;
-            Console.WriteLine($"\t{stopwatch.ElapsedMilliseconds.ToString()} Creating Parent + Child Copies");
+            Debug.WriteLine($"\t{stopwatch.ElapsedMilliseconds.ToString()} Creating Parent + Child Copies");
             foreach (var node in AllNodes)
             {
                 if (node.Parents.Count > parentMax)
@@ -198,14 +198,14 @@ namespace portent
                 node.ParentCopy = node.Parents.ToArray();
             }
 
-            Console.WriteLine($"\t{stopwatch.ElapsedMilliseconds.ToString()} Populating parentCounts");
+            Debug.WriteLine($"\t{stopwatch.ElapsedMilliseconds.ToString()} Populating parentCounts");
             var parentCounts = new Dictionary<int, HashSet<GraphNode>>(parentMax + 1);
             for (var i = 0; i <= parentMax; i++)
             {
                 parentCounts[i] = new HashSet<GraphNode>();
             }
 
-            Console.WriteLine($"\t{stopwatch.ElapsedMilliseconds.ToString()}");
+            Debug.WriteLine($"\t{stopwatch.ElapsedMilliseconds.ToString()}");
             foreach (var node in AllNodes)
             {
                 parentCounts[node.Parents.Count].Add(node);
@@ -219,7 +219,7 @@ namespace portent
             OrderedNodes.Capacity = total;
             var decider = new Dictionary<GraphNode, long>();
 
-            Console.WriteLine($"\t{stopwatch.ElapsedMilliseconds.ToString()} Starting Loop");
+            Debug.WriteLine($"\t{stopwatch.ElapsedMilliseconds.ToString()} Starting Loop");
             stopwatch.Restart();
             var innerStopwatch = new Stopwatch();
             while (added < total)
@@ -227,7 +227,7 @@ namespace portent
                 added++;
                 if (added % 100 == 0)
                 {
-                    Console.WriteLine($"\t{stopwatch.ElapsedMilliseconds.ToString()} Added: {added.ToString()} / {total.ToString()}. Time in inner loops: {innerStopwatch.ElapsedMilliseconds.ToString()}");
+                    Debug.WriteLine($"\t{stopwatch.ElapsedMilliseconds.ToString()} Added: {added.ToString()} / {total.ToString()}. Time in inner loops: {innerStopwatch.ElapsedMilliseconds.ToString()}");
                 }
 
                 decider.Clear();
@@ -305,7 +305,7 @@ namespace portent
                 potentials.Remove(node);
             }
 
-            Console.WriteLine($"\tTopological Sort complete. Inner loop took {innerStopwatch.ElapsedMilliseconds.ToString()} out of {stopwatch.ElapsedMilliseconds.ToString()} for the outer loop.");
+            Debug.WriteLine($"\tTopological Sort complete. Inner loop took {innerStopwatch.ElapsedMilliseconds.ToString()} out of {stopwatch.ElapsedMilliseconds.ToString()} for the outer loop.");
         }
 
         private void CollectNodes()

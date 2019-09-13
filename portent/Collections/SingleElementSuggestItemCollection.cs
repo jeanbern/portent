@@ -5,7 +5,7 @@ using System.Runtime.CompilerServices;
 
 namespace portent
 {
-    public sealed class SingleElementSuggestItemCollection : IEnumerable<SuggestItem>
+    internal sealed class SingleElementSuggestItemCollection : IEnumerable<SuggestItem>, IDisposable
     {
         private readonly SuggestItemEnumerator _enum = new SuggestItemEnumerator();
 
@@ -34,6 +34,11 @@ namespace portent
         IEnumerator IEnumerable.GetEnumerator()
         {
             return _enum;
+        }
+
+        public void Dispose()
+        {
+            _enum.Dispose();
         }
 
         private sealed class SuggestItemEnumerator : IEnumerator<SuggestItem>

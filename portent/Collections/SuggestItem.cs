@@ -3,7 +3,6 @@
     public struct SuggestItem
     {
         public string Term;
-        //public readonly int Distance = 0;
         public long Count;
 
         public SuggestItem(string term, long count)
