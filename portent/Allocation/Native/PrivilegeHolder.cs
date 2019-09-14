@@ -195,76 +195,74 @@ namespace portent
                 return;
             }
 
-            if (_needToRevert)
-            {
-                if (!_needToRevert)
-                {
-                    return;
-                }
-
-                if (!_currentThread.Equals(Thread.CurrentThread))
-                {
-                    throw new InvalidOperationException("Start and end thread must be the same.");
-                }
-
-                // This code must be eagerly prepared and non-interruptible.
-                int error = 0;
-                try
-                {
-                    // The payload is entirely in the finally block
-                    // This is how we ensure that the code will not be
-                    // interrupted by catastrophic exceptions
-                }
-                finally
-                {
-                    bool success = true;
-
-                    try
-                    {
-                        // Only call AdjustTokenPrivileges if we're not going to be reverting to self,
-                        // on this Revert, since doing the latter obliterates the thread token anyway
-
-                        if (_stateWasChanged
-                            && _tlsContents != null
-                            && (_tlsContents.ReferenceCountValue > 1
-                              || !_tlsContents.IsImpersonating))
-                        {
-                            TokenPrivilege newState;
-                            newState.PrivilegeCount = 1;
-                            newState.Privileges.Luid = _luid;
-                            newState.Privileges.Attributes = _initialState ? SePrivilegeAttributes.SePrivilegeEnabled : SePrivilegeAttributes.SePrivilegeDisabled;
-
-                            if (!NativeMethods.AdjustTokenPrivileges(
-                                              _tlsContents.ThreadHandle,
-                                              false,
-                                              ref newState,
-                                              0,
-                                              out _,
-                                              out _))
-                            {
-                                error = Marshal.GetLastWin32Error();
-                                success = false;
-                            }
-                        }
-                    }
-                    finally
-                    {
-                        if (success)
-                        {
-                            Reset();
-                        }
-                    }
-                }
-
-                if (error != 0)
-                {
-                    throw new InvalidOperationException();
-                }
-            }
-
             if (disposing)
             {
                 _tlsContents?.Dispose();
+            }
+
+            if (!_needToRevert)
+            {
+                _disposed = true;
+                return;
+            }
+
+            if (!_currentThread.Equals(Thread.CurrentThread))
+            {
+                throw new InvalidOperationException("Start and end thread must be the same.");
+            }
+
+            // This code must be eagerly prepared and non-interruptible.
+            int error = 0;
+            try
+            {
+                // The payload is entirely in the finally block
+                // This is how we ensure that the code will not be
+                // interrupted by catastrophic exceptions
+            }
+            finally
+            {
+                bool success = true;
+
+                try
+                {
+                    // Only call AdjustTokenPrivileges if we're not going to be reverting to self,
+                    // on this Revert, since doing the latter obliterates the thread token anyway
+
+                    if (_stateWasChanged
+                        && _tlsContents != null
+                        && (_tlsContents.ReferenceCountValue > 1
+                            || !_tlsContents.IsImpersonating))
+                    {
+                        TokenPrivilege newState;
+                        newState.PrivilegeCount = 1;
+                        newState.Privileges.Luid = _luid;
+                        newState.Privileges.Attributes = _initialState ? SePrivilegeAttributes.SePrivilegeEnabled : SePrivilegeAttributes.SePrivilegeDisabled;
+
+                        if (!NativeMethods.AdjustTokenPrivileges(
+                            _tlsContents.ThreadHandle,
+                            false,
+                            ref newState,
+                            0,
+                            out _,
+                            out _))
+                        {
+                            error = Marshal.GetLastWin32Error();
+                            success = false;
+                        }
+                    }
+                }
+                finally
+                {
+                    if (success)
+                    {
+                        Reset();
+                    }
+                }
+            }
+
+            if (error != 0)
+            {
+                throw new InvalidOperationException();
             }
 
             _disposed = true;

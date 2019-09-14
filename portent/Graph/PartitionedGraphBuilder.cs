@@ -173,9 +173,9 @@ namespace portent
 #pragma warning restore U2U1203 // Use foreach efficiently
             {
                 var currentCount = item.Parents.Count;
-                parentCounts[item.Parents.Count].Remove(item);
+                parentCounts[currentCount].Remove(item);
                 item.Parents.Remove(node);
-                parentCounts[item.Parents.Count].Add(item);
+                parentCounts[currentCount].Add(item);
                 node.ChildrenCopy?.Remove(item);
             }
         }

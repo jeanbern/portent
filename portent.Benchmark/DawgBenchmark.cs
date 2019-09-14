@@ -1,6 +1,7 @@
 ﻿using BenchmarkDotNet.Attributes;
 using System;
 using System.IO;
+using System.Linq;
 using System.Runtime;
 
 namespace portent.Benchmark
@@ -16,21 +17,13 @@ namespace portent.Benchmark
 
         public DawgBenchmark(bool fromBenchmarkRunner)
         {
-            if (fromBenchmarkRunner)
-            {
-                //Add a another level for the BenchmarkDotNet GUID
-                using var dawgStream = File.OpenRead("../" + SaveLocation);
-                _dawg = new Dawg(dawgStream);
-                using var queryStream = File.OpenRead("../" + Query1K);
-                _words = BuildQuery1K(queryStream);
-            }
-            else
-            {
-                using var dawgStream = File.OpenRead(SaveLocation);
-                _dawg = new Dawg(dawgStream);
-                using var queryStream = File.OpenRead(Query1K);
-                _words = BuildQuery1K(queryStream);
-            }
+            //Add a another level for the BenchmarkDotNet GUID
+            var prefix = fromBenchmarkRunner ? "../" : string.Empty;
+
+            using var dawgStream = File.OpenRead(prefix + SaveLocation);
+            _dawg = new Dawg(dawgStream);
+            using var queryStream = File.OpenRead(prefix + Query1K);
+            _words = BuildQuery1K(queryStream);
         }
 
         public DawgBenchmark() : this(true)
@@ -51,15 +44,11 @@ namespace portent.Benchmark
             }
 
             using var reader = new StreamReader(stream);
-            if (reader == null)
-            {
-                throw new InvalidOperationException();
-            }
 
             string? line;
             while ((line = reader.ReadLine()) != null)
             {
-                var lineParts = line.Split(null);
+                var lineParts = line.Split(default(char[]), StringSplitOptions.None);
                 if (lineParts?.Length == 3)
                 {
                     testList[i++] = lineParts[0];
@@ -112,6 +101,7 @@ namespace portent.Benchmark
         public int MaxErrors { get; set; }
 
         [GlobalSetup]
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Used via reflection by DotNetBenchmark")]
         public void SetupForRun()
         {
             GCSettings.LatencyMode = GCLatencyMode.Batch;
@@ -122,7 +112,7 @@ namespace portent.Benchmark
             for (var i = 0; i < _dawg.Count; i++)
             {
                 var word = _dawg.GetWord(i);
-                if (word == null || _dawg.GetIndex(word) != i)
+                if (_dawg.GetIndex(word) != i)
                 {
                     return false;
                 }
@@ -131,13 +121,25 @@ namespace portent.Benchmark
             return true;
         }
 
+        public int GetTotalResults()
+        {
+            var total = 0;
+            var dawg = _dawg;
+            foreach (var word in _words)
+            {
+                total += dawg.Lookup(word, MaxErrors).ToList().Count;
+            }
+
+            return total;
+        }
+
         [Benchmark]
         public void Benchmark()
         {
             var dawg = _dawg;
             foreach (var word in _words)
             {
-                var results = dawg.Lookup(word, MaxErrors);
+                dawg.Lookup(word, MaxErrors);
             }
         }
 
@@ -150,13 +152,8 @@ namespace portent.Benchmark
             {
                 if (disposing)
                 {
-                    // TODO: dispose managed state (managed objects).
+                    _dawg.Dispose();
                 }
-
-                // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
-                // TODO: set large fields to null.
-
-                _dawg.Dispose();
 
                 _disposedValue = true;
             }
@@ -165,6 +162,7 @@ namespace portent.Benchmark
         public void Dispose()
         {
             Dispose(true);
+            GC.SuppressFinalize(this);
         }
         #endregion
     }

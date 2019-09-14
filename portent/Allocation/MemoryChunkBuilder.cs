@@ -35,6 +35,8 @@ namespace portent
 
         public MemoryChunkBuilder ReserveAligned(long length)
         {
+            // TODO: Don't need to move to the next page if the current one still has room.
+            // This requires tracking how much is left on the last page.
             var necessaryOffset = MemoryAlignmentHelper.RequiredOffset(IntPtr.Zero, length);
             _count += length + necessaryOffset;
             return this;

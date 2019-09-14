@@ -59,7 +59,7 @@ namespace portent
 
         public int Count { get; private set; }
 
-        private class SuggestItemEnumerator : IEnumerator<SuggestItem>
+        private sealed class SuggestItemEnumerator : IEnumerator<SuggestItem>
         {
             private readonly SuggestItemCollection _myList;
             public readonly SuggestItem[] Items;
@@ -77,10 +77,6 @@ namespace portent
 
             object IEnumerator.Current => throw new InvalidCastException();
 
-            public void Dispose()
-            {
-            }
-
             public bool MoveNext()
             {
                 if (_index < _count)
@@ -97,6 +93,11 @@ namespace portent
             {
                 _index = 0;
                 _count = _myList.Count;
+            }
+
+            public void Dispose()
+            {
+                //Empty - Required by IEnumerator<T>, but nothing to dispose.
             }
         }
     }

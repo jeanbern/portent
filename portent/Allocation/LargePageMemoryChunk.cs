@@ -66,11 +66,10 @@ namespace portent
             var lengthInBytes = Unsafe.SizeOf<T>() * length;
             var necessaryOffset = MemoryAlignmentHelper.RequiredOffset(_ptr, _offset);
 
-            lengthInBytes += necessaryOffset;
-            Debug.Assert(_offset + lengthInBytes <= _bytesReserved);
+            Debug.Assert(_offset + lengthInBytes + necessaryOffset <= _bytesReserved);
 
             var result = (T*)(((byte*)_ptr) + _offset + necessaryOffset);
-            _offset += lengthInBytes;
+            _offset += lengthInBytes + necessaryOffset;
 
             return result;
         }
@@ -136,22 +135,25 @@ namespace portent
             }
         }
 
-        public static MemoryChunkBuilder Builder() => new MemoryChunkBuilder();
+        public static MemoryChunkBuilder Builder()
+        {
+            return new MemoryChunkBuilder();
+        }
 
         ~LargePageMemoryChunk()
         {
-            Dispose(false);
+            DisposeUnmanaged();
         }
 
         public void Dispose()
         {
-            Dispose(true);
+            DisposeUnmanaged();
             GC.SuppressFinalize(this);
         }
 
         private int _disposed;
 
-        private void Dispose(bool _1)
+        private void DisposeUnmanaged()
         {
             if (Interlocked.Increment(ref _disposed) == 1)
             {
@@ -398,14 +400,14 @@ namespace portent
             /// If the function succeeds, the return value is nonzero.
             /// If the function fails, the return value is 0 (zero). To get extended error information, call GetLastError.
             /// </returns>
-            public static bool VirtualFree(IntPtr lpAddress, IntPtr dwSize, MemoryFreeType dwFreeType)
+            public static void VirtualFree(IntPtr lpAddress, IntPtr dwSize, MemoryFreeType dwFreeType)
             {
                 if ((dwFreeType & MemoryFreeType.MemDecommit) != 0 && (dwFreeType & MemoryFreeType.MemRelease) != 0)
                 {
                     throw new InvalidOperationException("Do not use " + nameof(MemoryFreeType.MemDecommit) + " and " + nameof(MemoryFreeType.MemRelease) + " together.");
                 }
 
-                return VirtualFreeInterop(lpAddress, dwSize, dwFreeType);
+                VirtualFreeInterop(lpAddress, dwSize, dwFreeType);
             }
         }
     }

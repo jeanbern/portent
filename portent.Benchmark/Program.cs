@@ -1,5 +1,6 @@
 ﻿#if DEBUG
 using System;
+using System.Linq;
 #else
 using BenchmarkDotNet.Running;
 #endif
@@ -18,9 +19,12 @@ namespace portent.Benchmark
                 throw new InvalidOperationException();
             }
 
-            for (var i = 1; i < 2; i++)
+            // 497, 34814, 869864, 8775261
+            for (var i = 0; i < 4; i++)
             {
                 benchmark.MaxErrors = i;
+                Console.WriteLine(benchmark.GetTotalResults());
+
                 for (var j = 0; j < 400; j++)
                 {
                     benchmark.Benchmark();

@@ -145,7 +145,10 @@ namespace portent
 
             object IEnumerator.Current => throw new InvalidCastException();
 
-            public void Dispose() { }
+            public void Dispose()
+            {
+                //Empty - Required by IEnumerator<T>, but nothing to dispose.
+            }
         }
     }
 }

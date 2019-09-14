@@ -9,6 +9,12 @@ namespace portent
     public sealed class CompressedSparseRowGraph
     {
         public CompressedSparseRowGraph(int rootNodeIndex, int[] firstChildEdgeIndex, int[] edgeToNodeIndex, char[] edgeCharacter, ushort[] reachableTerminalNodes, long[] data, Dictionary<string, long> wordCounts)
+            : this(rootNodeIndex, firstChildEdgeIndex, edgeToNodeIndex, edgeCharacter, reachableTerminalNodes, data)
+        {
+            AssignCounts(RootNodeIndex, new char[100], 0, -1, wordCounts);
+        }
+
+        private CompressedSparseRowGraph(int rootNodeIndex, int[] firstChildEdgeIndex, int[] edgeToNodeIndex, char[] edgeCharacter, ushort[] reachableTerminalNodes, long[] data)
         {
             RootNodeIndex = rootNodeIndex;
             FirstChildEdgeIndex = firstChildEdgeIndex;
@@ -16,7 +22,6 @@ namespace portent
             EdgeCharacter = edgeCharacter;
             ReachableTerminalNodes = reachableTerminalNodes;
             WordCounts = data;
-            AssignCounts(RootNodeIndex, new char[100], 0, -1, wordCounts);
         }
 
         public readonly int RootNodeIndex;
@@ -52,8 +57,30 @@ namespace portent
             return reachableCount;
         }
 
+        public static CompressedSparseRowGraph Read(Stream stream)
+        {
+            return new CompressedSparseRowGraph(
+                stream.Read<int>(),
+                stream.ReadCompressedIntArray(),
+                stream.ReadArray<int>(),
+                stream.ReadCharArray(),
+                stream.ReadCompressedUshortArray(),
+                stream.ReadCompressedLongArray());
+        }
+
         public void Save(string path)
         {
+            if (string.IsNullOrEmpty(path))
+            {
+                throw new InvalidOperationException();
+            }
+
+            var fullPath = Path.GetFullPath(path);
+            if (!Directory.Exists(Path.GetDirectoryName(fullPath)))
+            {
+                throw new InvalidOperationException();
+            }
+
             using var stream = File.OpenWrite(path);
             if (stream == null)
             {
