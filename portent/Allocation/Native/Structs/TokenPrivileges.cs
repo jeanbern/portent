@@ -24,17 +24,36 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+using System;
+using System.Collections.Generic;
+
 namespace portent
 {
     /// <summary>
     /// See link for details.
     /// </summary>
     /// <see cref="https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.TOKEN_PRIVILEGE.cs"/>
-    internal unsafe struct TokenPrivilege
+    internal readonly struct TokenPrivilege
     {
-        public uint PrivilegeCount;
-        public LuidAndAttributes Privileges /*[ANYSIZE_ARRAY]*/;
+        public readonly uint PrivilegeCount;
+        public readonly LuidAndAttributes Privileges /*[ANYSIZE_ARRAY]*/;
 
-        public static readonly uint SizeOf = (uint)sizeof(TokenPrivilege);
+        public TokenPrivilege(uint privilegeCount, LuidAndAttributes privileges)
+        {
+            this.PrivilegeCount = privilegeCount;
+            this.Privileges = privileges;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is TokenPrivilege privilege &&
+                   this.PrivilegeCount == privilege.PrivilegeCount &&
+                   EqualityComparer<LuidAndAttributes>.Default.Equals(this.Privileges, privilege.Privileges);
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(this.PrivilegeCount, this.Privileges);
+        }
     }
 }

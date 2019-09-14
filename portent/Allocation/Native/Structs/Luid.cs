@@ -24,6 +24,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+using System;
 using System.Runtime.InteropServices;
 
 namespace portent
@@ -33,9 +34,27 @@ namespace portent
     /// </summary>
     /// <see cref="https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.LUID.cs"/>
     [StructLayout(LayoutKind.Sequential)]
-    internal struct Luid
+    internal readonly struct Luid
     {
-        internal int LowPart;
-        internal int HighPart;
+        internal readonly int LowPart;
+        internal readonly int HighPart;
+
+        public Luid(int lowPart, int highPart)
+        {
+            LowPart = lowPart;
+            HighPart = highPart;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is Luid luid &&
+                   this.LowPart == luid.LowPart &&
+                   this.HighPart == luid.HighPart;
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(this.LowPart, this.HighPart);
+        }
     }
 }

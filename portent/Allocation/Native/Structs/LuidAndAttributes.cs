@@ -24,6 +24,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 namespace portent
@@ -33,9 +35,27 @@ namespace portent
     /// </summary>
     /// <see cref="https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.LUID_AND_ATTRIBUTES.cs"/>
     [StructLayout(LayoutKind.Sequential)]
-    internal struct LuidAndAttributes
+    internal readonly struct LuidAndAttributes
     {
-        public Luid Luid;
-        public SePrivilegeAttributes Attributes;
+        public readonly Luid Luid;
+        public readonly SePrivilegeAttributes Attributes;
+
+        public LuidAndAttributes(Luid luid, SePrivilegeAttributes attributes)
+        {
+            this.Luid = luid;
+            this.Attributes = attributes;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is LuidAndAttributes attributes &&
+                   EqualityComparer<Luid>.Default.Equals(this.Luid, attributes.Luid) &&
+                   this.Attributes == attributes.Attributes;
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(this.Luid, this.Attributes);
+        }
     }
 }

@@ -83,12 +83,12 @@ namespace portent.Benchmark
                         continue;
                     }
 
-                    if (!long.TryParse(lineTokens[1], out var me))
+                    if (!long.TryParse(lineTokens[1], out var count))
                     {
                         continue;
                     }
 
-                    builder.Insert(lineTokens[0], me);
+                    builder.Insert(lineTokens[0], count);
                 }
             }
 

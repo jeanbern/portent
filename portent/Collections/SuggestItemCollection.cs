@@ -9,7 +9,9 @@ namespace portent
         public SuggestItemCollection(int count)
         {
             Items = new SuggestItem[count];
+#if DEBUG
             Capacity = count;
+#endif
             Count = 0;
             _myEnumerator = new SuggestItemEnumerator(this);
         }
@@ -19,7 +21,6 @@ namespace portent
         internal int Capacity;
 #else
         internal readonly SuggestItem[] Items;
-        private readonly int Capacity;
 #endif
         public void Add(SuggestItem item)
         {

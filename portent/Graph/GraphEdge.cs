@@ -1,6 +1,6 @@
 ﻿namespace portent
 {
-    public class GraphEdge
+    internal class GraphEdge
     {
         public char Label;
         public long Count;

@@ -8,6 +8,7 @@ namespace portent
 {
     public class PartitionedGraphBuilder
     {
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Critical Code Smell", "S1215:\"GC.Collect\" should not be called", Justification = "This method allocates multiple large arrays in the Large Object Heap")]
         public CompressedSparseRowGraph AsCompressedSparseRows()
         {
             var root = Finish();
@@ -60,15 +61,15 @@ namespace portent
         private readonly GraphNode[] _childStack = new GraphNode[MaxWordLength];
         private readonly GraphNode[] _parentStack = new GraphNode[MaxWordLength];
 
-        public List<GraphNode> AllNodes { get; } = new List<GraphNode>();
-        public List<GraphNode> OrderedNodes { get; } = new List<GraphNode>();
+        internal List<GraphNode> AllNodes { get; } = new List<GraphNode>();
+        internal List<GraphNode> OrderedNodes { get; } = new List<GraphNode>();
 
-        public int EdgeCount { get; private set; }
+        internal int EdgeCount { get; private set; }
 
         private int _stackTop = -1;
 
         public readonly Dictionary<string, long> Counts = new Dictionary<string, long>();
-        public int WordCount => Counts.Count;
+        internal int WordCount => Counts.Count;
 
         /// <summary>
         /// Inserts a word into the DAWG. Words are expected to be provided in a sorted order.
@@ -114,7 +115,7 @@ namespace portent
             Counts.Add(word, count);
         }
 
-        public GraphNode Finish()
+        internal GraphNode Finish()
         {
             var stopwatch = new Stopwatch();
             stopwatch.Start();

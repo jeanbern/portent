@@ -8,7 +8,7 @@ namespace portent
 {
     public sealed class CompressedSparseRowGraph
     {
-        public CompressedSparseRowGraph(int rootNodeIndex, int[] firstChildEdgeIndex, int[] edgeToNodeIndex, char[] edgeCharacter, ushort[] reachableTerminalNodes, long[] data, Dictionary<string, long> wordCounts)
+        internal CompressedSparseRowGraph(int rootNodeIndex, int[] firstChildEdgeIndex, int[] edgeToNodeIndex, char[] edgeCharacter, ushort[] reachableTerminalNodes, long[] data, Dictionary<string, long> wordCounts)
             : this(rootNodeIndex, firstChildEdgeIndex, edgeToNodeIndex, edgeCharacter, reachableTerminalNodes, data)
         {
             AssignCounts(RootNodeIndex, new char[100], 0, -1, wordCounts);
@@ -24,12 +24,12 @@ namespace portent
             WordCounts = data;
         }
 
-        public readonly int RootNodeIndex;
-        public readonly int[] FirstChildEdgeIndex;
-        public readonly int[] EdgeToNodeIndex;
-        public readonly char[] EdgeCharacter;
-        public readonly ushort[] ReachableTerminalNodes;
-        public readonly long[] WordCounts;
+        internal readonly int RootNodeIndex;
+        internal readonly int[] FirstChildEdgeIndex;
+        internal readonly int[] EdgeToNodeIndex;
+        internal readonly char[] EdgeCharacter;
+        internal readonly ushort[] ReachableTerminalNodes;
+        internal readonly long[] WordCounts;
 
         private int AssignCounts(int node, char[] builder, int builderLength, int reachableCount, Dictionary<string, long> counts)
         {

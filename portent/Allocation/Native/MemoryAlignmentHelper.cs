@@ -26,7 +26,9 @@ namespace portent
             return reserved;
         }
 
-        //TODO: I think this has unexpected behaviour for 0 or < 0
+        /// <summary>
+        /// Don't trust this for values <= 0
+        /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static long Ceiling(long dividend, long divisor)
         {
@@ -65,7 +67,6 @@ namespace portent
         /// <summary>
         /// The size in bytes of a processor cache line.
         /// </summary>
-        /// TODO: Maybe figure it out at runtime as a static readonly instead?
         public const int L1CacheLineSizeBytes = 64;
 
         private static UIntPtr _largePageMinimumBacking = UIntPtr.Zero;

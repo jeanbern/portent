@@ -5,7 +5,7 @@ using System.Text;
 
 namespace portent
 {
-    public class GraphNode
+    internal class GraphNode
     {
         /// <summary>
         /// This contains the children. It is not modified.

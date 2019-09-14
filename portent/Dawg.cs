@@ -172,7 +172,6 @@ namespace portent
                     var gLast = const_firstChildEdgeIndex[temp + 1];
 
                     var currentTarget = *spot;
-                    currentNode = int.MinValue;
                     for (; g < gLast; ++g)
                     {
                         if (currentTarget != t[g])
@@ -393,7 +392,6 @@ next:
                 builderIndex++;
                 nextBuilderPosition++;
                 currentWordCharacter++;
-                nextWordCharacter++;
             }
 
             // case: index + 1 == wordLength
@@ -1079,9 +1077,11 @@ next:
                 }
 
                 // Visual studio might tell you these 3 lines are unnecessary. Don't believe it.
+#pragma warning disable IDE0059 // Value assigned to symbol is never used
                 currentRow = previousRow;
                 previousRow -= stripeWidth;
                 --builderDepth;
+#pragma warning restore IDE0059 // Value assigned to symbol is never used
             }
 
             MatchCharacter(0);

@@ -25,6 +25,7 @@ SOFTWARE.
 */
 
 using System;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 
@@ -39,9 +40,6 @@ namespace portent
         private static Luid LuidFromPrivilege(string privilege, out bool success)
         {
             Luid luid;
-            luid.LowPart = 0;
-            luid.HighPart = 0;
-
             success = NativeMethods.LookupPrivilegeValue(null, privilege, out luid);
             return luid;
         }
@@ -66,10 +64,8 @@ namespace portent
                 // Nothing else gets run. We return.
             }
 
-            TokenPrivilege newState;
-            newState.PrivilegeCount = 1;
-            newState.Privileges.Luid = _luid;
-            newState.Privileges.Attributes = SePrivilegeAttributes.SePrivilegeEnabled;
+            var privileges = new LuidAndAttributes(_luid, SePrivilegeAttributes.SePrivilegeEnabled);
+            var newState = new TokenPrivilege(1, privileges);
 
             TokenPrivilege previousState;
 
@@ -78,7 +74,7 @@ namespace portent
                 _tlsContents.ThreadHandle,
                 false,
                 ref newState,
-                TokenPrivilege.SizeOf,
+                (uint)Unsafe.SizeOf<TokenPrivilege>(),
                 out previousState,
                 out _))
             {
@@ -123,19 +119,19 @@ namespace portent
                 try
                 {
                     // Retrieve TLS state
-                    var _tlsContents = TtlsSlotData;
-                    if (_tlsContents == null)
+                    var tlsContents = TtlsSlotData;
+                    if (tlsContents == null)
                     {
-                        TtlsSlotData = _tlsContents = TlsContents.Create();
+                        TtlsSlotData = tlsContents = TlsContents.Create();
                     }
                     else
                     {
-                        _tlsContents.IncrementReferenceCount();
+                        tlsContents.IncrementReferenceCount();
                     }
 
-                    if (_tlsContents != null)
+                    if (tlsContents != null)
                     {
-                        holder = new PrivilegeHolder(_tlsContents, luid);
+                        holder = new PrivilegeHolder(tlsContents, luid);
                         if (holder.ObtainPrivilege())
                         {
                             success = true;
@@ -233,10 +229,9 @@ namespace portent
                         && (_tlsContents.ReferenceCountValue > 1
                             || !_tlsContents.IsImpersonating))
                     {
-                        TokenPrivilege newState;
-                        newState.PrivilegeCount = 1;
-                        newState.Privileges.Luid = _luid;
-                        newState.Privileges.Attributes = _initialState ? SePrivilegeAttributes.SePrivilegeEnabled : SePrivilegeAttributes.SePrivilegeDisabled;
+                        var attribute = _initialState ? SePrivilegeAttributes.SePrivilegeEnabled : SePrivilegeAttributes.SePrivilegeDisabled;
+                        var privileges = new LuidAndAttributes(_luid, attribute);
+                        var newState = new TokenPrivilege(1, privileges);
 
                         if (!NativeMethods.AdjustTokenPrivileges(
                             _tlsContents.ThreadHandle,
@@ -246,7 +241,9 @@ namespace portent
                             out _,
                             out _))
                         {
+#pragma warning disable S1854 // Dead stores should be removed - How is this a dead store?
                             error = Marshal.GetLastWin32Error();
+#pragma warning restore S1854 // Dead stores should be removed
                             success = false;
                         }
                     }

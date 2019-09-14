@@ -25,6 +25,7 @@ SOFTWARE.
 */
 
 using System;
+using System.Diagnostics.CodeAnalysis;
 
 namespace portent
 {
@@ -33,6 +34,7 @@ namespace portent
     /// </summary>
     /// <see cref="https://github.com/dotnet/corefx/blob/master/src/System.Security.Principal.Windows/src/System/Security/Principal/TokenAccessLevels.cs"/>
     [Flags]
+    [SuppressMessage("Major Code Smell", "S4070:Non-flags enums should not be marked with \"FlagsAttribute\"", Justification = "Copied from Microsoft.")]
     public enum TokenAccessLevels
     {
         AssignPrimary = 0x00000001,

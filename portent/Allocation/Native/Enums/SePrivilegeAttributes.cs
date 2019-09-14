@@ -35,7 +35,8 @@ namespace portent
     [Flags]
     public enum SePrivilegeAttributes : uint
     {
-        SePrivilegeDisabled = 0x00000000,
+        None = 0x00000000,
+        SePrivilegeDisabled = None,
         SePrivilegeEnabledByDefault = 0x00000001,
         SePrivilegeEnabled = 0x00000002,
         SePrivilegeRemoved = 0x00000004,
