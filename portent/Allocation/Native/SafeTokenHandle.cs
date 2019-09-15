@@ -50,8 +50,7 @@ namespace portent
 
         public override bool IsInvalid
         {
-            get
-            { return handle == IntPtr.Zero || handle == new IntPtr(-1); }
+            get { return handle == IntPtr.Zero || handle == new IntPtr(-1); }
         }
 
         protected override bool ReleaseHandle()

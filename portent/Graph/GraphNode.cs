@@ -5,7 +5,7 @@ using System.Text;
 
 namespace portent
 {
-    internal class GraphNode
+    internal sealed class GraphNode
     {
         /// <summary>
         /// This contains the children. It is not modified.
@@ -43,7 +43,7 @@ namespace portent
         public GraphNode[]? ParentCopy;
 
         public bool IsTerminal { get; set; }
-        public int ReachableTerminalNodes { get; protected set; } = -1;
+        public int ReachableTerminalNodes { get; private set; } = -1;
         public long Count { get; set; }
         public bool Visited { get; set; }
         public int OrderedId { get; set; }

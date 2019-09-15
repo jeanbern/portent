@@ -25,6 +25,7 @@ SOFTWARE.
 */
 
 using System;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -39,8 +40,7 @@ namespace portent
     {
         private static Luid LuidFromPrivilege(string privilege, out bool success)
         {
-            Luid luid;
-            success = NativeMethods.LookupPrivilegeValue(null, privilege, out luid);
+            success = NativeMethods.LookupPrivilegeValue(null, privilege, out Luid luid);
             return luid;
         }
 
@@ -65,9 +65,8 @@ namespace portent
             }
 
             var privileges = new LuidAndAttributes(_luid, SePrivilegeAttributes.SePrivilegeEnabled);
-            var newState = new TokenPrivilege(1, privileges);
+            var newState = new TokenPrivilege(privileges);
 
-            TokenPrivilege previousState;
 
             // Place the new privilege on the thread token and remember the previous state.
             if (!NativeMethods.AdjustTokenPrivileges(
@@ -75,7 +74,7 @@ namespace portent
                 false,
                 ref newState,
                 (uint)Unsafe.SizeOf<TokenPrivilege>(),
-                out previousState,
+                out TokenPrivilege previousState,
                 out _))
             {
                 return Marshal.GetLastWin32Error() == 0;
@@ -156,7 +155,7 @@ namespace portent
             return holder;
         }
 
-        private PrivilegeHolder(TlsContents contents, Luid luid)
+        private PrivilegeHolder(TlsContents contents, in Luid luid)
         {
             _tlsContents = contents;
             _luid = luid;
@@ -231,7 +230,7 @@ namespace portent
                     {
                         var attribute = _initialState ? SePrivilegeAttributes.SePrivilegeEnabled : SePrivilegeAttributes.SePrivilegeDisabled;
                         var privileges = new LuidAndAttributes(_luid, attribute);
-                        var newState = new TokenPrivilege(1, privileges);
+                        var newState = new TokenPrivilege(privileges);
 
                         if (!NativeMethods.AdjustTokenPrivileges(
                             _tlsContents.ThreadHandle,
@@ -289,7 +288,6 @@ namespace portent
             [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true, BestFitMapping = false, EntryPoint = "LookupPrivilegeValueW")]
             internal static extern bool LookupPrivilegeValue([MarshalAs(UnmanagedType.LPTStr)] string? lpSystemName, [MarshalAs(UnmanagedType.LPTStr)] string lpName, out Luid lpLuid);
 
-            // TODO: Consumers should use a retry mechanism if the buffer supplied was too small.
             /// <summary>
             /// The AdjustTokenPrivileges function enables or disables privileges in the specified access token.
             /// Enabling or disabling privileges in an access token requires TOKEN_ADJUST_PRIVILEGES access.
@@ -328,6 +326,9 @@ namespace portent
             /// If the function succeeds, the return value is nonzero.
             /// To determine whether the function adjusted all of the specified privileges, call GetLastError.
             /// </returns>
+            /// <remarks>
+            /// This implementation uses <see cref="TokenPrivilege"/> which restricts it to checking one privilege at a time.
+            /// </remarks>
             /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-adjusttokenprivileges"/>
             [DllImport("advapi32.dll", SetLastError = true)]
             internal static extern bool AdjustTokenPrivileges(
@@ -376,7 +377,7 @@ namespace portent
             internal static extern bool GetTokenInformation(
                 SafeTokenHandle tokenHandle,
                 TokenInformationClass tokenInformationClass,
-                in FakeTokenPrivileges tokenInformation,
+                ref byte tokenInformation,
                 uint tokenInformationLength,
                 out uint returnLength);
 
@@ -392,27 +393,55 @@ namespace portent
             /// <returns>
             /// Whether or not the privilege is defined on the access token.
             /// </returns>
-            internal static unsafe bool HasPrivilege(SafeTokenHandle tokenHandle, Luid privilegeLuid)
+            internal static bool HasPrivilege(SafeTokenHandle tokenHandle, in Luid privilegeLuid)
             {
-                var tokenInformation = new FakeTokenPrivileges(1);
+                const int DefaultPrivilegeCount = 30;
+                Debug.Assert(Unsafe.SizeOf<LuidAndAttributes>() == 3 * sizeof(int));
+                var size = sizeof(uint) + (DefaultPrivilegeCount * Unsafe.SizeOf<LuidAndAttributes>());
+                Span<byte> allocated = stackalloc byte[size];
+                ref var asRef = ref MemoryMarshal.GetReference(allocated);
                 if (GetTokenInformation(tokenHandle,
                         TokenInformationClass.TokenPrivileges,
-                        in tokenInformation,
-                        sizeof(uint) + (tokenInformation.PrivilegeCount * 12),
-                        out _
-                    )
-                    && tokenInformation.PrivilegeCount <= 30)
+                        ref asRef,
+                        (uint)size,
+                        out var returnLength
+                    ))
                 {
-                    var privilegeStart = (int*)tokenInformation.FakePrivileges;
-                    for (var i = 0; i < tokenInformation.PrivilegeCount; i++)
+                    Debug.Assert(asRef <= DefaultPrivilegeCount);
+                    Debug.Assert(sizeof(uint) + (asRef * Unsafe.SizeOf<LuidAndAttributes>()) == returnLength);
+                    return HasPrivilege(ref Unsafe.As<byte, int>(ref asRef), privilegeLuid);
+                }
+
+                if (returnLength > size)
+                {
+                    Span<byte> largerAllocated = stackalloc byte[(int)returnLength];
+                    asRef = ref MemoryMarshal.GetReference(largerAllocated);
+                    if (GetTokenInformation(tokenHandle,
+                        TokenInformationClass.TokenPrivileges,
+                        ref asRef,
+                        returnLength,
+                        out var returnLength2
+                    ))
                     {
-                        var high = privilegeStart[0];
-                        var low = privilegeStart[1];
-                        privilegeStart += 3;
-                        if (high == privilegeLuid.HighPart && low == privilegeLuid.LowPart)
-                        {
-                            return true;
-                        }
+                        Debug.Assert(returnLength == returnLength2);
+                        Debug.Assert(sizeof(uint) + (asRef * Unsafe.SizeOf<LuidAndAttributes>()) == returnLength2);
+                        return HasPrivilege(ref Unsafe.As<byte, int>(ref asRef), privilegeLuid);
+                    }
+                }
+
+                return false;
+            }
+
+            private static bool HasPrivilege(ref int resultPointer, in Luid privilegeLuid)
+            {
+                var resultCount = resultPointer;
+                for (var i = 0; i < resultCount; i++)
+                {
+                    var high = Unsafe.Add(ref resultPointer, 1 + 3 * i);
+                    var low = Unsafe.Add(ref resultPointer, 2 + 3 * i);
+                    if (high == privilegeLuid.HighPart && low == privilegeLuid.LowPart)
+                    {
+                        return true;
                     }
                 }
 

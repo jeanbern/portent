@@ -7,10 +7,24 @@ namespace portent
 {
     internal static class MemoryAlignmentHelper
     {
-        public static long RequiredOffset(IntPtr start, long currentOffset)
+        public static long RequiredOffset(long start, long currentOffset, long requestedLength)
         {
-            var currentLocation = (long)start + currentOffset;
+            var currentLocation = start + currentOffset;
             var distanceFromPreviousBoundary = currentLocation % PageAlignmentBytes;
+
+            if (distanceFromPreviousBoundary + requestedLength < PageAlignmentBytes)
+            {
+                // It might fit in the current page.
+                var distanceFromPreviousCacheAlignment = distanceFromPreviousBoundary % L1CacheLineSizeBytes;
+                var distanceToNextCacheAlignment = L1CacheLineSizeBytes - distanceFromPreviousCacheAlignment;
+                var minimumCacheAlignmentOffset = distanceToNextCacheAlignment % L1CacheLineSizeBytes;
+                if (distanceFromPreviousBoundary + minimumCacheAlignmentOffset + requestedLength < PageAlignmentBytes)
+                {
+                    // It does fit in the current page.
+                    return 0;
+                }
+            }
+
             var distanceToNextBoundary = PageAlignmentBytes - distanceFromPreviousBoundary;
 
             var minimumBoundaryOffset = distanceToNextBoundary % PageAlignmentBytes;

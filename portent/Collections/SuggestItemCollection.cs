@@ -22,7 +22,7 @@ namespace portent
 #else
         internal readonly SuggestItem[] Items;
 #endif
-        public void Add(SuggestItem item)
+        public void Add(in SuggestItem item)
         {
 #if DEBUG
             if (Count == Capacity)
@@ -76,7 +76,7 @@ namespace portent
 
             public SuggestItem Current { get; private set; }
 
-            object IEnumerator.Current => throw new InvalidCastException();
+            object IEnumerator.Current => Current;
 
             public bool MoveNext()
             {

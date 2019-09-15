@@ -19,10 +19,7 @@ namespace portent
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Update(string term, long count)
         {
-            //TODO: does this even work?
-            var thing = _enum.Current;
-            thing.Term = term;
-            thing.Count = count;
+            _enum.Item = new SuggestItem(term, count);
             _enum.Ready = true;
         }
 
@@ -47,7 +44,7 @@ namespace portent
             public SuggestItem Item;
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Update(SuggestItem item)
+            public void Update(in SuggestItem item)
             {
                 Item = item;
                 Ready = false;
@@ -55,7 +52,7 @@ namespace portent
 
             public SuggestItem Current { get; internal set; }
 
-            object IEnumerator.Current => throw new InvalidCastException();
+            object IEnumerator.Current => Current;
 
             public void Dispose()
             {

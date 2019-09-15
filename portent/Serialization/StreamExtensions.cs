@@ -356,7 +356,6 @@ namespace JBP
                 if (size == sizeof(ushort))
                 {
                     //TODO: shortcut to reading directly into memory.
-                    //TODO: continue;
                 }
 
                 var length = stream.ReadCompressedInt();
@@ -392,7 +391,6 @@ namespace JBP
                 if (size == sizeof(int))
                 {
                     //TODO: shortcut to reading directly into memory.
-                    //TODO: continue;
                 }
 
                 var length = stream.ReadCompressedInt();
@@ -428,7 +426,6 @@ namespace JBP
                 if (size == sizeof(uint))
                 {
                     //TODO: shortcut to reading directly into memory.
-                    //TODO: continue;
                 }
 
                 var length = stream.ReadCompressedInt();
@@ -580,7 +577,7 @@ namespace JBP
 
             if (length == 0)
             {
-                Throw(new ArgumentOutOfRangeException());
+                Throw(new ArgumentOutOfRangeException(nameof(length)));
             }
 
             if (Unsafe.SizeOf<T>() * length < 256 - (3 * IntPtr.Size))
@@ -588,12 +585,12 @@ namespace JBP
                 return new T[length];
             }
 
-            return TypeAllocator<T>.AllocateUninitializedArray(length);
+            return TypeAllocator<T>.AllocateUninitializedArrayInternal(length);
         }
 
         private static class TypeAllocator<T>
         {
-            public static T[] AllocateUninitializedArray(int length)
+            public static T[] AllocateUninitializedArrayInternal(int length)
             {
                 if (!(MethodInfo.Invoke(null, new object[] { length }) is T[] result))
                 {

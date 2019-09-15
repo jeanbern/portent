@@ -30,7 +30,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace portent
 {
     /// <summary>
-    /// 
+    /// Contains values specifying possible token access levels.
     /// </summary>
     /// <see cref="https://github.com/dotnet/corefx/blob/master/src/System.Security.Principal.Windows/src/System/Security/Principal/TokenAccessLevels.cs"/>
     [Flags]

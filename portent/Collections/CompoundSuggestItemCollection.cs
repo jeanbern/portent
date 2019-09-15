@@ -49,7 +49,7 @@ namespace portent
         private readonly long[] MaximumBuffers;
 #endif
 
-        public unsafe IEnumerator<SuggestItem> GetEnumerator()
+        public IEnumerator<SuggestItem> GetEnumerator()
         {
 #if DEBUG
             for (var i = 0; i < BagCount; i++)
@@ -143,7 +143,7 @@ namespace portent
 
             public SuggestItem Current { get; private set; } = new SuggestItem();
 
-            object IEnumerator.Current => throw new InvalidCastException();
+            object IEnumerator.Current => Current;
 
             public void Dispose()
             {

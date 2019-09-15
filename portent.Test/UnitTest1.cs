@@ -7,6 +7,8 @@ namespace portent.Test
         [Fact]
         public void Test1()
         {
+            // Example test method
+            Assert.True(true);
         }
     }
 }

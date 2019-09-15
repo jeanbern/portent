@@ -1,9 +1,11 @@
-﻿namespace portent
+﻿using System;
+
+namespace portent
 {
-    public struct SuggestItem
+    public readonly struct SuggestItem : IEquatable<SuggestItem>
     {
-        public string Term;
-        public long Count;
+        public readonly string Term;
+        public readonly long Count;
 
         public SuggestItem(string term, long count)
         {
@@ -11,19 +13,19 @@
             Count = count;
         }
 
-        public static bool Equals(SuggestItem obj, SuggestItem obj2)
-        {
-            return obj.Count == obj2.Count && string.Equals(obj.Term, obj2.Term);
-        }
-
         public override bool Equals(object? obj)
         {
-            return obj is SuggestItem item && Equals(this, item);
+            return obj is SuggestItem item && Equals(item);
+        }
+
+        public bool Equals(SuggestItem other)
+        {
+            return Count == other.Count && string.Equals(Term, other.Term);
         }
 
         public override int GetHashCode()
         {
-            return Term.GetHashCode();
+            return HashCode.Combine(Count.GetHashCode(), Term.GetHashCode());
         }
 
         public static bool operator ==(SuggestItem left, SuggestItem right)

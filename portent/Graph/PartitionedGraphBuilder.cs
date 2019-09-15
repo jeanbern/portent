@@ -6,7 +6,7 @@ using System.Runtime;
 
 namespace portent
 {
-    public class PartitionedGraphBuilder
+    public sealed class PartitionedGraphBuilder
     {
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Critical Code Smell", "S1215:\"GC.Collect\" should not be called", Justification = "This method allocates multiple large arrays in the Large Object Heap")]
         public CompressedSparseRowGraph AsCompressedSparseRows()

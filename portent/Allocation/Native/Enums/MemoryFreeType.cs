@@ -9,7 +9,7 @@ namespace portent
     [Flags]
     public enum MemoryFreeType
     {
-        None = 0x00,
+        None = 0,
         MemCoalescePlaceholders = 0x00000001,
         MemPreservePlaceholder = 0x00000002,
         MemDecommit = 0x00004000,

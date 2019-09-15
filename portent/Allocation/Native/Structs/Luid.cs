@@ -34,7 +34,7 @@ namespace portent
     /// </summary>
     /// <see cref="https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.LUID.cs"/>
     [StructLayout(LayoutKind.Sequential)]
-    internal readonly struct Luid
+    internal readonly struct Luid : IEquatable<Luid>
     {
         internal readonly int LowPart;
         internal readonly int HighPart;
@@ -47,14 +47,18 @@ namespace portent
 
         public override bool Equals(object obj)
         {
-            return obj is Luid luid &&
-                   this.LowPart == luid.LowPart &&
-                   this.HighPart == luid.HighPart;
+            return obj is Luid other && Equals(other);
+        }
+
+        public bool Equals(Luid other)
+        {
+            return LowPart == other.LowPart &&
+            HighPart == other.HighPart;
         }
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(this.LowPart, this.HighPart);
+            return HashCode.Combine(LowPart, HighPart);
         }
     }
 }

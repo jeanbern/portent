@@ -32,28 +32,38 @@ namespace portent
     /// <summary>
     /// See link for details.
     /// </summary>
+    /// <remarks>
+    /// This is a special implementation that only contains a single <see cref="LuidAndAttributes"/> privilege.
+    /// </remarks>
     /// <see cref="https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.TOKEN_PRIVILEGE.cs"/>
-    internal readonly struct TokenPrivilege
+    internal readonly struct TokenPrivilege : IEquatable<TokenPrivilege>
     {
-        public readonly uint PrivilegeCount;
-        public readonly LuidAndAttributes Privileges /*[ANYSIZE_ARRAY]*/;
+        public const int Size = 12;
+        private const int PrivilegeCountConstant = 1;
 
-        public TokenPrivilege(uint privilegeCount, LuidAndAttributes privileges)
+        public readonly uint PrivilegeCount;
+        public readonly LuidAndAttributes Privileges;
+
+        public TokenPrivilege(in LuidAndAttributes privileges)
         {
-            this.PrivilegeCount = privilegeCount;
-            this.Privileges = privileges;
+            PrivilegeCount = PrivilegeCountConstant;
+            Privileges = privileges;
         }
 
         public override bool Equals(object obj)
         {
-            return obj is TokenPrivilege privilege &&
-                   this.PrivilegeCount == privilege.PrivilegeCount &&
-                   EqualityComparer<LuidAndAttributes>.Default.Equals(this.Privileges, privilege.Privileges);
+            return obj is TokenPrivilege other && Equals(other);
+        }
+
+        public bool Equals(TokenPrivilege other)
+        {
+            return PrivilegeCount == other.PrivilegeCount &&
+            EqualityComparer<LuidAndAttributes>.Default.Equals(Privileges, other.Privileges);
         }
 
         public override int GetHashCode()
         {
-            return HashCode.Combine(this.PrivilegeCount, this.Privileges);
+            return HashCode.Combine(PrivilegeCount, Privileges);
         }
     }
 }

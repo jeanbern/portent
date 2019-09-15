@@ -176,7 +176,10 @@ namespace portent
             _disposed = true;
         }
 
-        public void IncrementReferenceCount() => ReferenceCountValue++;
+        public void IncrementReferenceCount()
+        {
+            ReferenceCountValue++;
+        }
 
         public int DecrementReferenceCount()
         {

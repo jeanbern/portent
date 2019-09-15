@@ -27,7 +27,7 @@ SOFTWARE.
 using System;
 
 /// <summary>
-/// 
+/// Contains values specifying the attributes available for privileges.
 /// </summary>
 /// <see cref="https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.ProcessOptions.cs"/>
 namespace portent
@@ -35,7 +35,7 @@ namespace portent
     [Flags]
     public enum SePrivilegeAttributes : uint
     {
-        None = 0x00000000,
+        None = 0,
         SePrivilegeDisabled = None,
         SePrivilegeEnabledByDefault = 0x00000001,
         SePrivilegeEnabled = 0x00000002,

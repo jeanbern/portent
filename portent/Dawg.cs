@@ -1152,7 +1152,7 @@ nextIteration:
                     $"Index must be greater than or equal to 0 but was: {index.ToString()}.", nameof(index));
             }
 
-            if (index > this.Count)
+            if (index > Count)
             {
                 throw new ArgumentException("Index was outside the bounds of the array. " +
                     $"Index must be less than the number of elements ({Count.ToString()}) but was: {index.ToString()}. " +

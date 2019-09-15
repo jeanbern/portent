@@ -64,7 +64,7 @@ namespace portent
             where T : unmanaged
         {
             var lengthInBytes = Unsafe.SizeOf<T>() * length;
-            var necessaryOffset = MemoryAlignmentHelper.RequiredOffset(_ptr, _offset);
+            var necessaryOffset = MemoryAlignmentHelper.RequiredOffset((long)_ptr, _offset, length);
 
             Debug.Assert(_offset + lengthInBytes + necessaryOffset <= _bytesReserved);
 
@@ -104,7 +104,7 @@ namespace portent
             where T : unmanaged
         {
             var lengthInBytes = (long)Unsafe.SizeOf<T>() * array.Length;
-            var necessaryOffset = MemoryAlignmentHelper.RequiredOffset(_ptr, _offset);
+            var necessaryOffset = MemoryAlignmentHelper.RequiredOffset((long)_ptr, _offset, lengthInBytes);
 
             Debug.Assert(_offset + lengthInBytes + necessaryOffset <= _bytesReserved);
 

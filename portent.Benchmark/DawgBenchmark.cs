@@ -3,12 +3,13 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Runtime;
+using System.Diagnostics.CodeAnalysis;
 
 namespace portent.Benchmark
 {
     public class DawgBenchmark : IDisposable
     {
-        // /bin/$(Configuration)/netcore3.0/
+        // Backtrack from /bin/$(Configuration)/netcore3.0/
         private const string SaveLocation = "../../../lev7.aug";
         private const string Query1K = "../../../noisy_query_en_1000.txt";
 
@@ -17,7 +18,7 @@ namespace portent.Benchmark
 
         public DawgBenchmark(bool fromBenchmarkRunner)
         {
-            //Add a another level for the BenchmarkDotNet GUID
+            //Add a another level for the BenchmarkDotNet GUID folder
             var prefix = fromBenchmarkRunner ? "../" : string.Empty;
 
             using var dawgStream = File.OpenRead(prefix + SaveLocation);
@@ -101,7 +102,7 @@ namespace portent.Benchmark
         public int MaxErrors { get; set; }
 
         [GlobalSetup]
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Used via reflection by DotNetBenchmark")]
+        [SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Used via reflection by DotNetBenchmark")]
         public void SetupForRun()
         {
             GCSettings.LatencyMode = GCLatencyMode.Batch;
