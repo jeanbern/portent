@@ -68,7 +68,7 @@ namespace portent
 
         private int _stackTop = -1;
 
-        public readonly Dictionary<string, long> Counts = new Dictionary<string, long>();
+        private readonly Dictionary<string, long> Counts = new Dictionary<string, long>();
         internal int WordCount => Counts.Count;
 
         /// <summary>

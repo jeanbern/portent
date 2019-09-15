@@ -237,32 +237,30 @@ namespace JBP
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int ReadCompressedUshort(this Stream stream)
         {
-            ushort value = 0;
-            stream.ReadCompressed(ref value);
+            stream.ReadCompressed(out ushort value);
             return value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int ReadCompressedInt(this Stream stream)
         {
-            var value = 0;
-            stream.ReadCompressed(ref value);
+            stream.ReadCompressed(out int value);
             return value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static long ReadCompressedLong(this Stream stream)
         {
-            long value = 0;
-            stream.ReadCompressed(ref value);
+            stream.ReadCompressed(out long value);
             return value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ReadCompressed(this Stream stream, ref ushort value)
+        public static void ReadCompressed(this Stream stream, out ushort value)
         {
             var shift = 0;
             byte b;
+            value = 0;
             do
             {
                 b = (byte)stream.ReadByte();
@@ -278,10 +276,11 @@ namespace JBP
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ReadCompressed(this Stream stream, ref int value)
+        public static void ReadCompressed(this Stream stream, out int value)
         {
             var shift = 0;
             byte b;
+            value = 0;
             do
             {
                 b = (byte)stream.ReadByte();
@@ -297,10 +296,11 @@ namespace JBP
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ReadCompressed(this Stream stream, ref uint value)
+        public static void ReadCompressed(this Stream stream, out uint value)
         {
             var shift = 0;
             byte b;
+            value = 0;
             do
             {
                 b = (byte)stream.ReadByte();
@@ -316,10 +316,11 @@ namespace JBP
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ReadCompressed(this Stream stream, ref long value)
+        public static void ReadCompressed(this Stream stream, out long value)
         {
             var shift = 0;
             byte b;
+            value = 0;
             do
             {
                 b = (byte)stream.ReadByte();
@@ -362,7 +363,7 @@ namespace JBP
                 var end = index + length;
                 for (; index < end; index++)
                 {
-                    stream.ReadCompressed(ref values[index]);
+                    stream.ReadCompressed(out values[index]);
                 }
             }
 
@@ -397,7 +398,7 @@ namespace JBP
                 var end = index + length;
                 for (; index < end; index++)
                 {
-                    stream.ReadCompressed(ref values[index]);
+                    stream.ReadCompressed(out values[index]);
                 }
             }
 
@@ -432,7 +433,7 @@ namespace JBP
                 var end = index + length;
                 for (; index < end; index++)
                 {
-                    stream.ReadCompressed(ref values[index]);
+                    stream.ReadCompressed(out values[index]);
                 }
             }
 
@@ -468,7 +469,7 @@ namespace JBP
                 var end = index + length;
                 for (; index < end; index++)
                 {
-                    stream.ReadCompressed(ref values[index]);
+                    stream.ReadCompressed(out values[index]);
                 }
             }
 
@@ -516,13 +517,12 @@ namespace JBP
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ref T Read<T>(this Stream stream, ref T result)
+        public static void Read<T>(this Stream stream, ref T result)
             where T : unmanaged
         {
             var tSpan = MemoryMarshal.CreateSpan(ref result, 1);
             var span = MemoryMarshal.AsBytes(tSpan);
             stream.Read(span);
-            return ref result;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -602,7 +602,7 @@ namespace JBP
                 return result;
             }
 
-            private static readonly MethodInfo MethodInfo = GetAllocationMethod().MakeGenericMethod(new Type[] { typeof(T) });
+            private static readonly MethodInfo MethodInfo = GetAllocationMethod().MakeGenericMethod(new [] { typeof(T) });
 
             //TODO: HAHAHAHAHA very hacky indeed
             private static MethodInfo GetAllocationMethod()
