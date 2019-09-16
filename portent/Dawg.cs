@@ -87,14 +87,15 @@ namespace portent
             }
             else
             {
+                var maxPlusOne = maxEdits + 1;
                 for (var i = rootFirst; i < rootLast; ++i)
                 {
                     //To avoid "access to modified closure" which was causing real issues.
                     var i1 = i;
 #if DEBUG
-                    SearchWithEdits(i1, maxEdits, input, wordLength, toCache);
+                    SearchWithEdits(i1, maxPlusOne, input, wordLength, toCache);
 #else
-                    tasks[i - rootFirst] = Task.Run(() => SearchWithEdits(i1, maxEdits, input, wordLength, toCache));
+                    tasks[i - rootFirst] = Task.Run(() => SearchWithEdits(i1, maxPlusOne, input, wordLength, toCache));
 #endif
                 }
             }
@@ -102,7 +103,6 @@ namespace portent
 #if !DEBUG
             Task.WaitAll(tasks);
 #endif
-
             return _compoundResultCollection;
         }
 
@@ -121,35 +121,39 @@ namespace portent
             // Technically it's const, but it's contents aren't
             var builderStart = MemoryAlignmentHelper.GetCacheAlignedStart<char>(builderBytes);
 
+            var const_firstChildEdgeIndex = _firstChildEdgeIndex;
             var const_edgeToNodeIndex = _edgeToNodeIndex;
             var const_edgeCharacter = _edgeCharacter;
-            var const_firstChildEdgeIndex = _firstChildEdgeIndex;
             var const_reachableTerminalNodes = _reachableTerminalNodes;
             var const_root = _rootNodeIndex;
 
+            // Things I tried that don't make a difference:
+            // 1. Making this method static and using a readonly ref struct for the const_ variables
+            //    "static int GetIndex(in Holder consts, int length)"
             int GetIndex(int length)
             {
                 // Because we want 0-indexed
                 var number = -1;
 
                 var currentNode = const_root;
-                var word = builderStart;
-                var end = builderStart + length;
+                ref var word = ref Unsafe.AsRef<char>(builderStart);
+                ref var end = ref Unsafe.Add(ref Unsafe.AsRef<char>(builderStart), length);
                 do
                 {
+                    var target = word;
+                    word = ref Unsafe.Add(ref word, 1);
                     var i = const_firstChildEdgeIndex[currentNode];
                     var lastChildIndex = const_firstChildEdgeIndex[currentNode + 1];
-                    for (; i < lastChildIndex; ++i)
+                    do
                     {
-                        if (const_edgeCharacter[i] != *word)
+                        var nextNode = const_edgeToNodeIndex[i];
+                        if (const_edgeCharacter[i] != target)
                         {
-                            var nextNode = const_edgeToNodeIndex[i];
-                            var nextNodeAbs = Abs(nextNode);
-                            number += const_reachableTerminalNodes[nextNodeAbs];
+                            number += const_reachableTerminalNodes[Abs(nextNode)];
                             continue;
                         }
 
-                        currentNode = const_edgeToNodeIndex[i];
+                        currentNode = nextNode;
                         if (currentNode < 0)
                         {
                             ++number;
@@ -157,23 +161,23 @@ namespace portent
                         }
 
                         break;
-                    }
-
-                    ++word;
-                } while (word < end);
+                    } while (++i < lastChildIndex);
+                } while (Unsafe.IsAddressLessThan(ref word, ref end));
 
                 return number;
             }
 
-            var nextBuilderPosition = builderStart + 1;
+            var builderIndex = builderStart;
 
             var const_results = _resultCollection;
             var const_wordEnd = word + wordLength;
             var const_wordCount = _wordCounts;
 
+            // Things I tried that don't make a difference:
+            // 1. Making this method static and using a readonly ref struct for the const_ variables
+            //    "static void SearchWithoutEdits(in Holder consts, char* builderPosition, int currentNode, char* input)"
             void SearchWithoutEdits(int currentNode, char* input)
             {
-                var t = const_edgeCharacter;
                 var spot = input;
                 do
                 {
@@ -184,7 +188,7 @@ namespace portent
                     var currentTarget = *spot;
                     for (; g < gLast; ++g)
                     {
-                        if (currentTarget != t[g])
+                        if (currentTarget != const_edgeCharacter[g])
                         {
                             continue;
                         }
@@ -207,139 +211,140 @@ namespace portent
                 if (currentNode < 0)
                 {
                     var inputRemaining = (int)(const_wordEnd - input);
-                    Unsafe.CopyBlock(nextBuilderPosition, input, (uint)(inputRemaining * sizeof(char)));
+                    Unsafe.CopyBlock(builderIndex + 1, input, (uint)(inputRemaining * sizeof(char)));
 
-                    var resultLength = (int)(nextBuilderPosition - builderStart) + inputRemaining;
+                    var resultLength = (int)(builderIndex + 1 - builderStart) + inputRemaining;
                     const_results.Add(new SuggestItem(new string(builderStart, 0, resultLength), const_wordCount[GetIndex(resultLength)]));
                 }
             }
 
             var nextNode = _rootNodeIndex;
-            var currentWordCharacter = word;
             var nextWordCharacter = word + 1;
-            var builderIndex = builderStart;
+            var target = *word;
 
-            for (var index = 0; index < wordLength - 2; ++index)
+            if (wordLength > 1)
             {
-                nextNode = Abs(nextNode);
-                var i = const_firstChildEdgeIndex[nextNode];
-                var iLast = const_firstChildEdgeIndex[nextNode + 1];
-                nextNode = int.MaxValue;
-                for (; i < iLast; ++i)
+                var secondTarget = *nextWordCharacter;
+                for (var index = 0; index < wordLength - 2; ++index)
                 {
-                    var firstEdgeChar = const_edgeCharacter[i];
-                    var edgeNode = const_edgeToNodeIndex[i];
-                    *builderIndex = firstEdgeChar;
-
-                    if (firstEdgeChar == *currentWordCharacter)
+                    nextNode = Abs(nextNode);
+                    var i = const_firstChildEdgeIndex[nextNode];
+                    var iLast = const_firstChildEdgeIndex[nextNode + 1];
+                    nextNode = int.MaxValue;
+                    var thirdTarget = *(nextWordCharacter + 1);
+                    for (; i < iLast; ++i)
                     {
-                        nextNode = edgeNode;
-                        continue;
-                    }
-
-                    if (firstEdgeChar != *nextWordCharacter)
-                    {
-                        //substitution and continue
-                        SearchWithoutEdits(edgeNode, nextWordCharacter);
-
-                        //insertion and continue
-                        SearchWithoutEdits(edgeNode, currentWordCharacter);
-
-                        continue;
-                    }
-
-                    // firstEdgeChar == secondTarget
-                    var temp = Abs(edgeNode);
-                    var k = const_firstChildEdgeIndex[temp];
-                    var kLast = const_firstChildEdgeIndex[temp + 1];
-
-                    nextBuilderPosition++;
-                    var thirdWordCharacter = nextWordCharacter + 1;
-                    for (; k < kLast; ++k)
-                    {
-                        var secondEdgeChar = const_edgeCharacter[k];
-                        if (secondEdgeChar == *currentWordCharacter)
+                        var firstEdgeChar = const_edgeCharacter[i];
+                        var edgeNode = const_edgeToNodeIndex[i];
+                        *builderIndex = firstEdgeChar;
+                        if (firstEdgeChar == target)
                         {
-                            // Can't use builderCurrent in this case because we incremented it outside this loop.
-                            *(builderIndex + 1) = secondEdgeChar;
-                            var noEditNode = const_edgeToNodeIndex[k];
-                            // insertion + match + withoutEdits
-                            SearchWithoutEdits(noEditNode, nextWordCharacter);
-                            // transposition + withoutEdits
-                            SearchWithoutEdits(noEditNode, thirdWordCharacter);
-                        }
-                        else if (secondEdgeChar == *nextWordCharacter)
-                        {
-                            // Can't use builderCurrent in this case because we incremented it outside this loop.
-                            *(builderIndex + 1) = secondEdgeChar;
-                            // substitution + match + withoutEdit
-                            SearchWithoutEdits(const_edgeToNodeIndex[k], thirdWordCharacter);
+                            nextNode = edgeNode;
+                            continue;
                         }
 
-                        // ReSharper disable once InvertIf
-                        if (secondEdgeChar == *thirdWordCharacter)
+                        if (firstEdgeChar != secondTarget)
                         {
-                            if (index + 3 == wordLength)
-                            {
-                                // ReSharper disable once InvertIf
-                                if (const_edgeToNodeIndex[k] < 0)
-                                {
-                                    // Can't use builderCurrent in this case because we incremented it outside this loop.
-                                    *(builderIndex + 1) = secondEdgeChar;
-                                    //deletion + match + match + end
-                                    const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength + 1), const_wordCount[GetIndex(wordLength + 1)]));
-                                }
-                            }
-                            else
+                            //substitution and continue
+                            SearchWithoutEdits(edgeNode, nextWordCharacter);
+
+                            //insertion and continue
+                            SearchWithoutEdits(edgeNode, nextWordCharacter - 1);
+
+                            continue;
+                        }
+
+                        // firstEdgeChar == secondTarget
+                        var temp = Abs(edgeNode);
+                        var k = const_firstChildEdgeIndex[temp];
+                        var kLast = const_firstChildEdgeIndex[temp + 1];
+
+                        builderIndex++;
+                        for (; k < kLast; ++k)
+                        {
+                            var secondEdgeChar = const_edgeCharacter[k];
+                            if (secondEdgeChar == target)
                             {
                                 // Can't use builderCurrent in this case because we incremented it outside this loop.
-                                *(builderIndex + 1) = secondEdgeChar;
-                                //deletion + match + match + continue
-                                SearchWithoutEdits(const_edgeToNodeIndex[k], thirdWordCharacter + 1);
+                                *builderIndex = secondEdgeChar;
+                                var noEditNode = const_edgeToNodeIndex[k];
+                                // insertion + match + withoutEdits
+                                SearchWithoutEdits(noEditNode, nextWordCharacter);
+                                // transposition + withoutEdits
+                                SearchWithoutEdits(noEditNode, nextWordCharacter + 1);
+                            }
+                            else if (secondEdgeChar == secondTarget)
+                            {
+                                // Can't use builderCurrent in this case because we incremented it outside this loop.
+                                *builderIndex = secondEdgeChar;
+                                // substitution + match + withoutEdit
+                                SearchWithoutEdits(const_edgeToNodeIndex[k], nextWordCharacter + 1);
+                            }
+
+                            // ReSharper disable once InvertIf
+                            if (secondEdgeChar == thirdTarget)
+                            {
+                                if (index + 3 == wordLength)
+                                {
+                                    // ReSharper disable once InvertIf
+                                    if (const_edgeToNodeIndex[k] < 0)
+                                    {
+                                        // Can't use builderCurrent in this case because we incremented it outside this loop.
+                                        *builderIndex = secondEdgeChar;
+                                        //deletion + match + match + end
+                                        var wordIndex = GetIndex(wordLength - 1);
+                                        const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength - 1), const_wordCount[wordIndex]));
+                                    }
+                                }
+                                else
+                                {
+                                    // Can't use builderCurrent in this case because we incremented it outside this loop.
+                                    *builderIndex = secondEdgeChar;
+                                    //deletion + match + match + continue
+                                    SearchWithoutEdits(const_edgeToNodeIndex[k], nextWordCharacter + 2);
+                                }
                             }
                         }
+
+                        builderIndex--;
                     }
 
-                    nextBuilderPosition--;
+                    if (nextNode == int.MaxValue)
+                    {
+                        return;
+                    }
+
+                    *builderIndex = target;
+                    target = secondTarget;
+                    secondTarget = thirdTarget;
+                    builderIndex++;
+                    nextWordCharacter++;
                 }
 
-                if (nextNode == int.MaxValue)
-                {
-                    return;
-                }
-
-                *builderIndex = *currentWordCharacter;
-                builderIndex++;
-                nextBuilderPosition++;
-                currentWordCharacter++;
-                nextWordCharacter++;
-            }
-
-            //case : index + 2 == wordLength
-            {
-                nextNode = Abs(nextNode);
-                var i = const_firstChildEdgeIndex[nextNode];
-                var iLast = const_firstChildEdgeIndex[nextNode + 1];
+                //case : index + 2 == wordLength
+                var jTemp = Abs(nextNode);
+                var j = const_firstChildEdgeIndex[jTemp];
+                var jLast = const_firstChildEdgeIndex[jTemp + 1];
                 nextNode = int.MaxValue;
-                for (; i < iLast; ++i)
+                for (; j < jLast; ++j)
                 {
-                    var firstEdgeChar = const_edgeCharacter[i];
-                    var edgeNode = const_edgeToNodeIndex[i];
+                    var firstEdgeChar = const_edgeCharacter[j];
+                    var edgeNode = const_edgeToNodeIndex[j];
                     *builderIndex = firstEdgeChar;
 
-                    if (firstEdgeChar == *currentWordCharacter)
+                    if (firstEdgeChar == target)
                     {
                         nextNode = edgeNode;
                         continue;
                     }
 
-                    if (firstEdgeChar != *nextWordCharacter)
+                    if (firstEdgeChar != secondTarget)
                     {
                         //substitution and continue
                         SearchWithoutEdits(edgeNode, nextWordCharacter);
 
                         //insertion and continue
-                        SearchWithoutEdits(edgeNode, currentWordCharacter);
+                        SearchWithoutEdits(edgeNode, nextWordCharacter - 1);
 
                         continue;
                     }
@@ -355,17 +360,18 @@ namespace portent
                         const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength - 1), const_wordCount[GetIndex(wordLength - 1)]));
                     }
 
+                    builderIndex++;
                     for (; k < kLast; ++k)
                     {
                         var secondEdgeChar = const_edgeCharacter[k];
-                        if (secondEdgeChar == *currentWordCharacter)
+                        if (secondEdgeChar == target)
                         {
                             var currentNode = const_edgeToNodeIndex[k];
                             if (currentNode < 0)
                             {
                                 currentNode = -currentNode;
                                 //transposition:
-                                *nextBuilderPosition = secondEdgeChar;
+                                *builderIndex = secondEdgeChar;
                                 const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength), const_wordCount[GetIndex(wordLength)]));
                             }
 
@@ -374,23 +380,25 @@ namespace portent
                             for (; m < mLast; ++m)
                             {
                                 var thirdEdgeChar = const_edgeCharacter[m];
-                                if (thirdEdgeChar == *nextWordCharacter && const_edgeToNodeIndex[m] < 0)
+                                if (thirdEdgeChar == secondTarget && const_edgeToNodeIndex[m] < 0)
                                 {
-                                    *nextBuilderPosition = secondEdgeChar;
-                                    *(nextBuilderPosition + 1) = thirdEdgeChar;
+                                    *builderIndex = secondEdgeChar;
+                                    *(builderIndex + 1) = thirdEdgeChar;
                                     //insertion + match
                                     const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength + 1), const_wordCount[GetIndex(wordLength + 1)]));
                                     break;
                                 }
                             }
                         }
-                        else if (secondEdgeChar == *nextWordCharacter && const_edgeToNodeIndex[k] < 0)
+                        else if (secondEdgeChar == secondTarget && const_edgeToNodeIndex[k] < 0)
                         {
                             //substitution + match:
-                            *nextBuilderPosition = secondEdgeChar;
+                            *builderIndex = secondEdgeChar;
                             const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength), const_wordCount[GetIndex(wordLength)]));
                         }
                     }
+
+                    builderIndex--;
                 }
 
                 if (nextNode == int.MaxValue)
@@ -398,10 +406,9 @@ namespace portent
                     return;
                 }
 
-                *builderIndex = *currentWordCharacter;
+                *builderIndex = target;
+                target = secondTarget;
                 builderIndex++;
-                nextBuilderPosition++;
-                currentWordCharacter++;
             }
 
             // case: index + 1 == wordLength
@@ -432,15 +439,15 @@ namespace portent
 
                 var j = const_firstChildEdgeIndex[edgeNode];
                 var jLast = const_firstChildEdgeIndex[edgeNode + 1];
-                if (firstEdgeChar != *currentWordCharacter)
+                if (firstEdgeChar != target)
                 {
                     for (; j < jLast; ++j)
                     {
                         var secondEdgeChar = const_edgeCharacter[j];
-                        if (secondEdgeChar == *currentWordCharacter && const_edgeToNodeIndex[j] < 0)
+                        if (secondEdgeChar == target && const_edgeToNodeIndex[j] < 0)
                         {
                             // insertions + match at end of word.
-                            *nextBuilderPosition = *currentWordCharacter;
+                            *(builderIndex + 1) = target;
                             const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength + 1), const_wordCount[GetIndex(wordLength + 1)]));
                         }
                     }
@@ -452,7 +459,7 @@ namespace portent
                         if (const_edgeToNodeIndex[j] < 0)
                         {
                             //match + insertions at end of word.
-                            *nextBuilderPosition = const_edgeCharacter[j];
+                            *(builderIndex + 1) = const_edgeCharacter[j];
                             const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength + 1), const_wordCount[GetIndex(wordLength + 1)]));
                         }
                     }
@@ -465,14 +472,12 @@ namespace portent
         private void Search2Edits(int edge, // Not captured
             char* word, int wordLength, int* toCache)
         {
-            // TODO: Test most of these locals to see if it's faster to capture or re-calculate them every time.
-
             // The real stripeWidth is usually 2*max + 1 = 5
             // Normally we would do a bound check and calculate a value for the cell in previousRow directly after our stripe.
             // Instead we pre-assign the cell when we have the values handy and then ignore bound checking.
             // For this reason, the stripeWidth gets an additional + 1, making it 2 * max + 2 = 6
-            // TODO: Testing with 8 for cache boundary divisibility. Shouldn't matter?
-            const int stripeWidth = 8;
+            // I already tried making it 8 for cache alignment, it didn't matter.
+            const int stripeWidth = 6;
 
             // +2 for maxEdits = 2, then distribute the multiplication to take advantage of const.
             // Would be otherwise be: (wordLength + maxEdits)*stripeWidth
@@ -493,9 +498,7 @@ namespace portent
             var builder = MemoryAlignmentHelper.GetCacheAlignedStart<char>(builderBytes);
             var editMatrix = MemoryAlignmentHelper.GetCacheAlignedStart<int>(editMatrixAlloc);
 
-            // These 3 variables, in addition to the 2 later, are used for parameter passing in MatchCharacterX
-            var previousRow = editMatrix + (3 * stripeWidth);
-            var currentRow = previousRow + stripeWidth;
+            // This variable, in addition to the 2 later, are used for parameter passing in MatchCharacterX
             var builderDepth = 4;
 
             // These two variables are used for parameter passing between MatchCharacter1-3
@@ -504,6 +507,12 @@ namespace portent
 
             void MatchCharacterX(int skip)
             {
+                // One row was skipped when compared to SearchWithEdits.
+                // It's the one that gets assigned in a loop: "const_row0[x] = x + 1"
+                // For this reason, currentRow and previousRow are one stripeWidth behind.
+                var currentRow = editMatrix + (builderDepth * stripeWidth);
+                var previousRow = currentRow - stripeWidth;
+
                 // This is the value for the column directly before our diagonal stripe.
                 // In this case, 3 is too many anyways, so no need to compute it.
                 var currentRowPreviousColumn = 3;
@@ -511,7 +520,6 @@ namespace portent
                 // Normally the strip would travel diagonally through the matrix. We shift it left to keep it starting at 0.
                 // previousRowOffset == 1 once we have started shifting.
                 // Our stripe ignores early characters once we've gone deep enough.
-
                 var previousRowPreviousColumn = previousRow[skip];
                 var wordWithOffset = word + builderDepth - 2;
                 var previousWordCharacter = wordWithOffset[skip];
@@ -574,7 +582,6 @@ namespace portent
                 var top = currentRow + to;
                 *top = currentRowPreviousColumn + 1;
 
-                // TODO: Is it faster to use this temp variable and not assign to skip as often?
                 var counterSpot = currentRow + skip;
                 if (*counterSpot > 2)
                 {
@@ -597,8 +604,6 @@ namespace portent
                 var last = edgeIndex[temp + 1];
 
                 ++builderDepth;
-                previousRow = currentRow;
-                currentRow += stripeWidth;
                 for (; i < last; ++i)
                 {
                     currentCharacter = builder[builderDepth] = edgeCharacters[i];
@@ -607,14 +612,9 @@ namespace portent
                 }
 
                 builderDepth--;
-                currentRow = previousRow;
-                previousRow -= stripeWidth;
             }
 
             // Some variables are not used in all MatchCharacter functions. Moved them closer to usage.
-            // How do closures work here, does the struct getting passed contain all of them no matter where declared?
-            // Does the deeper struct contain repeated information?
-            // TODO: Consider building a nested struct myself. Nested as in union, not reference or copy.
             var to4 = toCache[4];
             var to3 = toCache[3];
             var row1 = editMatrix + stripeWidth;
@@ -681,7 +681,6 @@ namespace portent
                 // In addition, we perform this write even when it's not necessary because checking that condition is more expensive.
                 row3[to3] = currentRowPreviousColumn + 1;
 
-                //TODO: Is it faster to use a temp for this loop and write to skip after? Would save some writes to memory? Unless it's registerized already.
                 if (row3[skip] > 2)
                 {
                     ++skip;
@@ -735,7 +734,6 @@ namespace portent
                         else
                         {
                             // transposition
-                            // "Debug.Assert((previousRow - stripeWidth)[j - 2] == j + 1);"
                             row2[j] = currentRowPreviousColumn = Math.Min(result2, row0[j - 2] + 1);
                         }
                     }
@@ -771,7 +769,6 @@ namespace portent
                 row2[to2] = currentRowPreviousColumn + 1;
 
                 var skip = 0;
-                //TODO: Is it faster to use a temp for this loop and write to skip after? Would save some writes to memory? Unless it's registerized already.
                 if (row2[skip] > 2)
                 {
                     ++skip;
@@ -898,7 +895,7 @@ namespace portent
         [LocalsInit(false)]
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         private void SearchWithEdits(int edge, // Not captured
-            int max, char* first, int wordLength, int* toCache)
+            int maxPlusOne, char* first, int wordLength, int* toCache)
         {
             var index = _edgeToNodeIndex;
             var characters = _edgeCharacter;
@@ -906,21 +903,25 @@ namespace portent
             var wordCount = _wordCounts;
             var results = _compoundResultCollection.Bags[edge - _rootFirstChild];
 
-            // TODO: test if this is faster captured in the closure or re-calculated every time.
             // The real stripeWidth is 2*max + 1
             // Normally we would do a bound check and calculate a value for the cell in previousRow directly after our stripe.
             // Instead we pre-assign the cell when we have the values handy and then ignore bound checking.
-            var const_stripeWidth = (2 * max) + 2;
+            // For this reason, the stripeWidth gets an additional + 1, making it 2 * max + 2
+            var const_stripeWidth = 2 * maxPlusOne;
 
-            var const_row0 = stackalloc int[(wordLength + max + 1) * const_stripeWidth];
+            var matrixLength = MemoryAlignmentHelper.GetCacheAlignedSize<int>((wordLength + maxPlusOne) * const_stripeWidth);
+            var editMatrixAlloc = stackalloc byte[matrixLength];
+            var const_row0 = MemoryAlignmentHelper.GetCacheAlignedStart<int>(editMatrixAlloc);
 
-            // We're skipping the left-most column from the original algorithm. It's just a constant so ignore it.
-            for (var x = 0; x <= max; ++x)
+            for (var x = 0; x < maxPlusOne; ++x)
             {
                 const_row0[x] = x + 1;
             }
 
-            var const_builder = stackalloc char[wordLength + max];
+            var builderByteLength = MemoryAlignmentHelper.GetCacheAlignedSize<char>(wordLength + maxPlusOne -1);
+            var builderAlloc = stackalloc byte[builderByteLength];
+            var const_builder = MemoryAlignmentHelper.GetCacheAlignedStart<char>(builderAlloc);
+
             var edgeCharacter = characters[edge];
             const_builder[0] = edgeCharacter;
 
@@ -931,10 +932,9 @@ namespace portent
             {
                 // This is the value for the column directly before our diagonal stripe.
                 // It's the one we avoided setting in previousRow earlier.
-                // TODO: would it be faster to access it from memory rather than compute over and over?
                 var currentRowPreviousColumn = builderDepth + skip + 1;
 
-                var previousRow = const_row0 + builderDepth * const_stripeWidth;
+                var previousRow = const_row0 + (builderDepth * const_stripeWidth);
                 var currentRow = previousRow + const_stripeWidth;
 
                 char previousWordCharacter;
@@ -945,7 +945,7 @@ namespace portent
                 // previousRowOffset == 1 once we have started shifting.
                 int previousRowOffset;
                 // Our stripe ignores early characters once we've gone deep enough.
-                var wordArrayOffset = builderDepth - max;
+                var wordArrayOffset = builderDepth - maxPlusOne + 1;
 
                 if (wordArrayOffset <= 0)
                 {
@@ -982,17 +982,15 @@ namespace portent
                         else
                         {
                             // Transposition case!
-                            // BuilderDepth > 0: Otherwise there is no previous character to transpose.
+                            // Assert BuilderDepth > 0: Otherwise there is no previous character to transpose.
                             if (builderDepth == 1)
                             {
                                 // There is no (previousRow - rowWidth). It would be row 0 in the Levenshtein matrix, the one with no letters.
                                 // In this case, the cell value is simply it's column # j
                                 // Use that instead of (previousRow - stripeWidth)[j - 2]
-
-                                //when there is no previousPreviousRow to [-2] into
                                 currentRowPreviousColumn = Math.Min(result2, j);
                             }
-                            else if (builderDepth <= max)
+                            else if (builderDepth < maxPlusOne)
                             {
                                 // The stripes haven't started shifting yet: look up, move left 2. ((previousrow - rowWidth)[j - 2])
                                 // If we can't move left:
@@ -1010,7 +1008,7 @@ namespace portent
                                 // It's the first stripe shift: look up, move left 1. ((previousrow - rowWidth)[j - 1])
                                 // OR
                                 // At least 2 stripes are shifted: look up. ((previousrow - rowWidth)[j])
-                                var diff = builderDepth == max + 1 ? 1 : 0;
+                                var diff = builderDepth == maxPlusOne ? 1 : 0;
                                 currentRowPreviousColumn = Math.Min(result2, (previousRow - const_stripeWidth)[j - diff] + 1);
                             }
                         }
@@ -1025,7 +1023,8 @@ namespace portent
 
                     previousWordCharacter = wordCharacter;
                     currentRow[j] = currentRowPreviousColumn;
-                    any |= currentRowPreviousColumn - max - 1;
+                    // Will make `any` negative if currentRowPreviousColumn > maxErrors
+                    any |= currentRowPreviousColumn - maxPlusOne;
                 }
 
                 if (any >= 0)
@@ -1033,13 +1032,12 @@ namespace portent
                     return;
                 }
 
-                // TODO: can I simplify these checks?
-                if (node < 0 && currentRowPreviousColumn <= max && builderDepth + 1 + max >= wordLength)
+                if (node < 0 && currentRowPreviousColumn < maxPlusOne && builderDepth + maxPlusOne >= wordLength)
                 {
                     results.Add(new SuggestItem(new string(const_builder, 0, builderDepth + 1), wordCount[GetIndex(ref Unsafe.AsRef<char>(const_builder), builderDepth + 1)]));
                 }
 
-                if (builderDepth + 1 >= wordLength + max)
+                if (builderDepth + 2 >= wordLength + maxPlusOne)
                 {
                     return;
                 }
@@ -1052,10 +1050,10 @@ namespace portent
 
                 // Would use a register instead of writing to a variable.
                 var counterSpot = currentRow + skip;
-                if (*counterSpot > max)
+                if (*counterSpot >= maxPlusOne)
                 {
                     ++counterSpot;
-                    while (counterSpot <= top && *counterSpot > max)
+                    while (counterSpot <= top && *counterSpot >= maxPlusOne)
                     {
                         ++counterSpot;
                     }
@@ -1080,7 +1078,7 @@ namespace portent
                     MatchCharacter(skip);
                 }
 
-                // Visual studio might tell you this lines is unnecessary. Don't believe it.
+                // Visual studio might tell you this line is unnecessary. Don't believe it.
 #pragma warning disable IDE0059 // Value assigned to symbol is never used
                 --builderDepth;
 #pragma warning restore IDE0059 // Value assigned to symbol is never used
