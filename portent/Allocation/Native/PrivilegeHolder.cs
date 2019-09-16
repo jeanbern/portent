@@ -284,7 +284,8 @@ namespace portent
             /// If the function succeeds, the function returns nonzero.
             /// If the function fails, it returns zero. To get extended error information, call GetLastError.
             /// </returns>
-            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-lookupprivilegevaluea"/>
+            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-lookupprivilegevaluew"/>
+            /// <see cref="https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.LookupPrivilegeValue.cs"/>
             [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true, BestFitMapping = false, EntryPoint = "LookupPrivilegeValueW")]
             internal static extern bool LookupPrivilegeValue([MarshalAs(UnmanagedType.LPTStr)] string? lpSystemName, [MarshalAs(UnmanagedType.LPTStr)] string lpName, out Luid lpLuid);
 
@@ -330,6 +331,7 @@ namespace portent
             /// This implementation uses <see cref="TokenPrivilege"/> which restricts it to checking one privilege at a time.
             /// </remarks>
             /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-adjusttokenprivileges"/>
+            /// <see cref="https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.AdjustTokenPrivileges.cs"/>
             [DllImport("advapi32.dll", SetLastError = true)]
             internal static extern bool AdjustTokenPrivileges(
                 SafeTokenHandle tokenHandle,

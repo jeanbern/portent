@@ -78,7 +78,11 @@ namespace portent
                 {
                     //To avoid "access to modified closure" which was causing real issues.
                     var i1 = i;
+#if DEBUG
+                    Search2Edits(i1, input, wordLength, toCache);
+#else
                     tasks[i - rootFirst] = Task.Run(() => Search2Edits(i1, input, wordLength, toCache));
+#endif
                 }
             }
             else
@@ -87,11 +91,17 @@ namespace portent
                 {
                     //To avoid "access to modified closure" which was causing real issues.
                     var i1 = i;
+#if DEBUG
+                    SearchWithEdits(i1, maxEdits, input, wordLength, toCache);
+#else
                     tasks[i - rootFirst] = Task.Run(() => SearchWithEdits(i1, maxEdits, input, wordLength, toCache));
+#endif
                 }
             }
 
+#if !DEBUG
             Task.WaitAll(tasks);
+#endif
 
             return _compoundResultCollection;
         }
@@ -189,7 +199,7 @@ namespace portent
                     return;
 #pragma warning restore S1751 // Loops with at most one iteration should be refactored
 
-next:
+                    next:
                     ++spot;
                 } while (spot < const_wordEnd);
 
@@ -342,7 +352,7 @@ next:
                     if (edgeNode < 0)
                     {
                         //deletion + match:
-                        const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength -1), const_wordCount[GetIndex(wordLength - 1)]));
+                        const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength - 1), const_wordCount[GetIndex(wordLength - 1)]));
                     }
 
                     for (; k < kLast; ++k)
@@ -492,9 +502,8 @@ next:
             var currentCharacter = builder[0] = edgeCharacters[edge];
             var node = edgeToNodeIndex[edge];
 
-            void MatchCharacterX(int skipOriginal)
+            void MatchCharacterX(int skip)
             {
-                var skip = skipOriginal;
                 // This is the value for the column directly before our diagonal stripe.
                 // In this case, 3 is too many anyways, so no need to compute it.
                 var currentRowPreviousColumn = 3;
@@ -551,7 +560,7 @@ next:
 
                 if (node < 0 && currentRowPreviousColumn <= 2 && wordLength <= builderDepth + 3)
                 {
-                    results.Add(new SuggestItem(new string(builder, 0, builderDepth + 1), wordCount[GetIndex(builder, builderDepth + 1)]));
+                    results.Add(new SuggestItem(new string(builder, 0, builderDepth + 1), wordCount[GetIndex(ref Unsafe.AsRef<char>(builder), builderDepth + 1)]));
                 }
 
                 if (wordLength < builderDepth)
@@ -612,9 +621,8 @@ next:
             var row2 = editMatrix + (2 * stripeWidth);
             var row3 = editMatrix + (3 * stripeWidth);
 
-            void MatchCharacter3(int skipOriginal)
+            void MatchCharacter3(int skip)
             {
-                var skip = skipOriginal;
                 var currentRowPreviousColumn = 3;
                 var previousRowPreviousColumn = row2[skip];
                 var firstWithOffset = word + 1;
@@ -660,7 +668,7 @@ next:
 
                 if (node < 0 && currentRowPreviousColumn <= 2 && wordLength <= 6)
                 {
-                    results.Add(new SuggestItem(new string(builder, 0, 4), wordCount[GetIndex(builder, 4)]));
+                    results.Add(new SuggestItem(new string(builder, 0, 4), wordCount[GetIndex(ref Unsafe.AsRef<char>(builder), 4)]));
                 }
 
                 if (wordLength < 3)
@@ -749,7 +757,7 @@ next:
 
                 if (node < 0 && currentRowPreviousColumn <= 2 && wordLength <= 5)
                 {
-                    results.Add(new SuggestItem(new string(builder, 0, 3), wordCount[GetIndex(builder, 3)]));
+                    results.Add(new SuggestItem(new string(builder, 0, 3), wordCount[GetIndex(ref Unsafe.AsRef<char>(builder), 3)]));
                 }
 
                 if (wordLength < 2)
@@ -833,7 +841,7 @@ next:
                 row1[to1] = currentRowPreviousColumn + 1;
                 if (node < 0 && currentRowPreviousColumn <= 2 && wordLength <= 4)
                 {
-                    results.Add(new SuggestItem(new string(builder, 0, 2), wordCount[GetIndex(builder, 2)]));
+                    results.Add(new SuggestItem(new string(builder, 0, 2), wordCount[GetIndex(ref Unsafe.AsRef<char>(builder), 2)]));
                 }
 
                 var temp = Abs(node);
@@ -873,7 +881,7 @@ next:
 
             if (node < 0 && (wordLength < 3 || (wordLength == 3 && row0[2] == 2)))
             {
-                results.Add(new SuggestItem(new string(builder, 0, 1), wordCount[GetIndex(builder, 1)]));
+                results.Add(new SuggestItem(new string(builder, 0, 1), wordCount[GetIndex(ref Unsafe.AsRef<char>(builder), 1)]));
             }
 
             var temp = Abs(node);
@@ -902,25 +910,21 @@ next:
             // The real stripeWidth is 2*max + 1
             // Normally we would do a bound check and calculate a value for the cell in previousRow directly after our stripe.
             // Instead we pre-assign the cell when we have the values handy and then ignore bound checking.
-            var stripeWidth = (2 * max) + 2;
+            var const_stripeWidth = (2 * max) + 2;
 
-            var previousRow = stackalloc int[(wordLength + max + 1) * stripeWidth];
+            var const_row0 = stackalloc int[(wordLength + max + 1) * const_stripeWidth];
 
             // We're skipping the left-most column from the original algorithm. It's just a constant so ignore it.
             for (var x = 0; x <= max; ++x)
             {
-                previousRow[x] = x + 1;
+                const_row0[x] = x + 1;
             }
 
-            var builder = stackalloc char[wordLength + max];
+            var const_builder = stackalloc char[wordLength + max];
             var edgeCharacter = characters[edge];
-            builder[0] = edgeCharacter;
+            const_builder[0] = edgeCharacter;
 
             var node = index[edge];
-
-            // This pointer is incremented and decremented before and after recursive calls.
-            // TODO: is it faster to have a local instead, and use builderDepth * stripeWidth
-            var currentRow = previousRow + stripeWidth;
             var builderDepth = 0;
 
             void MatchCharacter(int skip)
@@ -929,6 +933,9 @@ next:
                 // It's the one we avoided setting in previousRow earlier.
                 // TODO: would it be faster to access it from memory rather than compute over and over?
                 var currentRowPreviousColumn = builderDepth + skip + 1;
+
+                var previousRow = const_row0 + builderDepth * const_stripeWidth;
+                var currentRow = previousRow + const_stripeWidth;
 
                 char previousWordCharacter;
                 int previousRowPreviousColumn;
@@ -966,7 +973,7 @@ next:
                     if (edgeCharacter != wordCharacter)
                     {
                         var result2 = Math.Min(result1, previousRowPreviousColumn) + 1;
-                        if ((edgeCharacter != previousWordCharacter) || (builderDepth == 0) || (builder[builderDepth - 1] != wordCharacter))
+                        if ((edgeCharacter != previousWordCharacter) || (builderDepth == 0) || (const_builder[builderDepth - 1] != wordCharacter))
                         {
                             // Non-match.
                             // Expected case.
@@ -979,9 +986,8 @@ next:
                             if (builderDepth == 1)
                             {
                                 // There is no (previousRow - rowWidth). It would be row 0 in the Levenshtein matrix, the one with no letters.
-
-                                // TODO: sanity check the following statement:
                                 // In this case, the cell value is simply it's column # j
+                                // Use that instead of (previousRow - stripeWidth)[j - 2]
 
                                 //when there is no previousPreviousRow to [-2] into
                                 currentRowPreviousColumn = Math.Min(result2, j);
@@ -996,7 +1002,7 @@ next:
                                 }
                                 else
                                 {
-                                    currentRowPreviousColumn = Math.Min(result2, (previousRow - stripeWidth)[j - 2] + 1);
+                                    currentRowPreviousColumn = Math.Min(result2, (previousRow - const_stripeWidth)[j - 2] + 1);
                                 }
                             }
                             else
@@ -1005,7 +1011,7 @@ next:
                                 // OR
                                 // At least 2 stripes are shifted: look up. ((previousrow - rowWidth)[j])
                                 var diff = builderDepth == max + 1 ? 1 : 0;
-                                currentRowPreviousColumn = Math.Min(result2, (previousRow - stripeWidth)[j - diff] + 1);
+                                currentRowPreviousColumn = Math.Min(result2, (previousRow - const_stripeWidth)[j - diff] + 1);
                             }
                         }
                     }
@@ -1030,7 +1036,7 @@ next:
                 // TODO: can I simplify these checks?
                 if (node < 0 && currentRowPreviousColumn <= max && builderDepth + 1 + max >= wordLength)
                 {
-                    results.Add(new SuggestItem(new string(builder, 0, builderDepth + 1), wordCount[GetIndex(builder, builderDepth + 1)]));
+                    results.Add(new SuggestItem(new string(const_builder, 0, builderDepth + 1), wordCount[GetIndex(ref Unsafe.AsRef<char>(const_builder), builderDepth + 1)]));
                 }
 
                 if (builderDepth + 1 >= wordLength + max)
@@ -1067,19 +1073,15 @@ next:
                 var last = edgeIndex[temp + 1];
 
                 ++builderDepth;
-                previousRow = currentRow;
-                currentRow += stripeWidth;
                 for (; i < last; ++i)
                 {
-                    builder[builderDepth] = edgeCharacter = characters[i];
+                    const_builder[builderDepth] = edgeCharacter = characters[i];
                     node = index[i];
                     MatchCharacter(skip);
                 }
 
-                // Visual studio might tell you these 3 lines are unnecessary. Don't believe it.
+                // Visual studio might tell you this lines is unnecessary. Don't believe it.
 #pragma warning disable IDE0059 // Value assigned to symbol is never used
-                currentRow = previousRow;
-                previousRow -= stripeWidth;
                 --builderDepth;
 #pragma warning restore IDE0059 // Value assigned to symbol is never used
             }
@@ -1094,26 +1096,28 @@ next:
             // Because we want 0-indexed
             var number = -1;
             var currentNode = _rootNodeIndex;
-            var index = _edgeToNodeIndex;
-            var characters = _edgeCharacter;
-            var edgeIndex = _firstChildEdgeIndex;
-            var reachableNodes = _reachableTerminalNodes;
+            ref var edgeChildIndex = ref Unsafe.AsRef<int>(_firstChildEdgeIndex);
+            ref var edgeNodeIndex = ref Unsafe.AsRef<int>(_edgeToNodeIndex);
+            ref var characters = ref Unsafe.AsRef<char>(_edgeCharacter);
+            ref var terminals = ref Unsafe.AsRef<ushort>(_reachableTerminalNodes);
             for (var w = 0; w < word.Length; ++w)
             {
                 var target = word[w];
                 var temp = Abs(currentNode);
-                var i = edgeIndex[temp];
-                var lastChildIndex = edgeIndex[temp + 1];
+                var i = Unsafe.Add(ref edgeChildIndex, temp);
+                var lastChildIndex = Unsafe.Add(ref edgeChildIndex, temp + 1);
 
                 for (; i < lastChildIndex; ++i)
                 {
-                    if (characters[i] != target)
+                    var nextNode = Unsafe.Add(ref edgeNodeIndex, i);
+                    if (Unsafe.Add(ref characters, i) != target)
                     {
-                        number += reachableNodes[Abs(index[i])];
+                        var nextNodeAbs = Abs(nextNode);
+                        number += Unsafe.Add(ref terminals, nextNodeAbs);
                         continue;
                     }
 
-                    currentNode = index[i];
+                    currentNode = nextNode;
                     if (currentNode < 0)
                     {
                         ++number;
@@ -1128,7 +1132,7 @@ next:
                 return -1;
 #pragma warning restore S1751 // Loops with at most one iteration should be refactored
 
-nextIteration:
+                nextIteration:
 #pragma warning disable S1116 // Empty statements should be removed - This statement is important. It allows the label/goto to work.
                 ;
 #pragma warning restore S1116 // Empty statements should be removed
@@ -1162,20 +1166,20 @@ nextIteration:
             // Because we want 0-indexed
             var count = index + 1;
             var currentNode = _rootNodeIndex;
-            var edgeNodeIndex = _edgeToNodeIndex;
-            var characters = _edgeCharacter;
-            var edgeIndex = _firstChildEdgeIndex;
-            var reachableNodes = _reachableTerminalNodes;
+            ref var edgeChildIndex = ref Unsafe.AsRef<int>(_firstChildEdgeIndex);
+            ref var edgeNodeIndex = ref Unsafe.AsRef<int>(_edgeToNodeIndex);
+            ref var characters = ref Unsafe.AsRef<char>(_edgeCharacter);
+            ref var terminals = ref Unsafe.AsRef<ushort>(_reachableTerminalNodes);
             var builder = _builder;
             builder.Length = 0;
-            while (count > 0)
+            do
             {
-                var i = edgeIndex[currentNode];
-                var lastChildIndex = edgeIndex[currentNode + 1];
+                var i = Unsafe.Add(ref edgeChildIndex, currentNode);
+                var lastChildIndex = Unsafe.Add(ref edgeChildIndex, currentNode + 1);
                 for (; i < lastChildIndex; ++i)
                 {
-                    var nextNode = edgeNodeIndex[i];
-                    var nextNumber = reachableNodes[Abs(nextNode)];
+                    var nextNode = Unsafe.Add(ref edgeNodeIndex, i);
+                    var nextNumber = Unsafe.Add(ref terminals, Abs(nextNode));
                     if (nextNumber < count)
                     {
                         count -= nextNumber;
@@ -1189,10 +1193,10 @@ nextIteration:
                         currentNode = -currentNode;
                     }
 
-                    builder.Append(characters[i]);
+                    builder.Append(Unsafe.Add(ref characters, i));
                     break;
                 }
-            }
+            } while (count > 0);
 
             Debug.Assert(count == 0);
             return builder.ToString();
@@ -1201,35 +1205,34 @@ nextIteration:
         // This one has fewer checks because it's private and we only call it with a real word
         [Pure]
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-        private int GetIndex(char* word, int length)
+        private int GetIndex(ref char word, int length)
         {
             // Because we want 0-indexed
             var number = -1;
+            ref char pointy = ref word;
 
             var currentNode = _rootNodeIndex;
-            var terminals = _reachableTerminalNodes;
-            var index = _edgeToNodeIndex;
-            var characters = _edgeCharacter;
-            var edgeIndex = _firstChildEdgeIndex;
-            var end = word + length;
-            while (word < end)
+            ref var edgeChildIndex = ref Unsafe.AsRef<int>(_firstChildEdgeIndex);
+            ref var edgeNodeIndex = ref Unsafe.AsRef<int>(_edgeToNodeIndex);
+            ref var characters = ref Unsafe.AsRef<char>(_edgeCharacter);
+            ref var terminals = ref Unsafe.AsRef<ushort>(_reachableTerminalNodes);
+            ref var end = ref Unsafe.Add(ref pointy, length);
+            do
             {
-                var target = *word;
-                ++word;
-                var i = edgeIndex[currentNode];
-                var lastChildIndex = edgeIndex[currentNode + 1];
-
-                for (; i < lastChildIndex; ++i)
+                var target = pointy;
+                pointy = ref Unsafe.Add(ref pointy, 1);
+                var i = Unsafe.Add(ref edgeChildIndex, currentNode);
+                var lastChildIndex = Unsafe.Add(ref edgeChildIndex, currentNode + 1);
+                do
                 {
-                    if (characters[i] != target)
+                    var nextNode = Unsafe.Add(ref edgeNodeIndex, i);
+                    if (Unsafe.Add(ref characters, i) != target)
                     {
-                        var nextNode = index[i];
-                        var nextNodeAbs = Abs(nextNode);
-                        number += terminals[nextNodeAbs];
+                        number += Unsafe.Add(ref terminals, Abs(nextNode));
                         continue;
                     }
 
-                    currentNode = index[i];
+                    currentNode = nextNode;
                     if (currentNode < 0)
                     {
                         ++number;
@@ -1237,8 +1240,8 @@ nextIteration:
                     }
 
                     break;
-                }
-            }
+                } while (++i < lastChildIndex);
+            } while (Unsafe.IsAddressLessThan(ref pointy, ref end));
 
             return number;
         }
@@ -1274,31 +1277,35 @@ nextIteration:
 
         private readonly StringBuilder _builder = new StringBuilder(50);
 
+        public Dawg(Stream stream) : this(CompressedSparseRowGraph.Read(stream))
+        {
+        }
+
         [SuppressMessage("Critical Code Smell", "S1215:\"GC.Collect\" should not be called", Justification = "This method allocates multiple large arrays in the Large Object Heap")]
-        private Dawg(int rootNodeIndex, int[] firstChildEdgeIndex, int[] edgeToNodeIndex, char[] edgeCharacter, ushort[] reachableTerminalNodes, long[] wordCounts)
+        public Dawg(CompressedSparseRowGraph compressedSparseRows)
         {
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
             GC.Collect();
 
-            _rootNodeIndex = rootNodeIndex;
-            Count = wordCounts.Length;
+            _rootNodeIndex = compressedSparseRows.RootNodeIndex;
+            Count = compressedSparseRows.WordCounts.Length;
 
             _memoryBlock = LargePageMemoryChunk.Builder()
-                .ReserveAligned(firstChildEdgeIndex)
-                .ReserveAligned(edgeToNodeIndex)
-                .ReserveAligned(edgeCharacter)
-                .ReserveAligned(reachableTerminalNodes)
-                .ReserveAligned(wordCounts)
+                .ReserveAligned(compressedSparseRows.FirstChildEdgeIndex)
+                .ReserveAligned(compressedSparseRows.EdgeToNodeIndex)
+                .ReserveAligned(compressedSparseRows.EdgeCharacter)
+                .ReserveAligned(compressedSparseRows.ReachableTerminalNodes)
+                .ReserveAligned(compressedSparseRows.WordCounts)
                 .Allocate();
 
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
             GC.Collect();
 
-            _firstChildEdgeIndex = _memoryBlock.CopyArrayAligned(firstChildEdgeIndex);
-            _edgeToNodeIndex = _memoryBlock.CopyArrayAligned(edgeToNodeIndex);
-            _edgeCharacter = _memoryBlock.CopyArrayAligned(edgeCharacter);
-            _reachableTerminalNodes = _memoryBlock.CopyArrayAligned(reachableTerminalNodes);
-            _wordCounts = _memoryBlock.CopyArrayAligned(wordCounts);
+            _firstChildEdgeIndex = _memoryBlock.CopyArrayAligned(compressedSparseRows.FirstChildEdgeIndex);
+            _edgeToNodeIndex = _memoryBlock.CopyArrayAligned(compressedSparseRows.EdgeToNodeIndex);
+            _edgeCharacter = _memoryBlock.CopyArrayAligned(compressedSparseRows.EdgeCharacter);
+            _reachableTerminalNodes = _memoryBlock.CopyArrayAligned(compressedSparseRows.ReachableTerminalNodes);
+            _wordCounts = _memoryBlock.CopyArrayAligned(compressedSparseRows.WordCounts);
 
             _rootFirstChild = _firstChildEdgeIndex[_rootNodeIndex];
             _rootLastChild = _firstChildEdgeIndex[_rootNodeIndex + 1];
@@ -1311,20 +1318,6 @@ nextIteration:
             GC.Collect();
 
             _memoryBlock.Lock();
-        }
-
-        public Dawg(Stream stream) : this(CompressedSparseRowGraph.Read(stream))
-        {
-        }
-
-        public Dawg(CompressedSparseRowGraph compressedSparseRows) : this(
-            compressedSparseRows.RootNodeIndex,
-            compressedSparseRows.FirstChildEdgeIndex,
-            compressedSparseRows.EdgeToNodeIndex,
-            compressedSparseRows.EdgeCharacter,
-            compressedSparseRows.ReachableTerminalNodes,
-            compressedSparseRows.WordCounts)
-        {
         }
 
         public void Dispose()
