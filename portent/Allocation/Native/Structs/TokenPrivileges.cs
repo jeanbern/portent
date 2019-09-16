@@ -50,15 +50,16 @@ namespace portent
             Privileges = privileges;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
-            return obj is TokenPrivilege other && Equals(other);
+            return obj is TokenPrivilege other
+                && Equals(other);
         }
 
         public bool Equals(TokenPrivilege other)
         {
-            return PrivilegeCount == other.PrivilegeCount &&
-            EqualityComparer<LuidAndAttributes>.Default.Equals(Privileges, other.Privileges);
+            return PrivilegeCount == other.PrivilegeCount
+                && EqualityComparer<LuidAndAttributes>.Default.Equals(Privileges, other.Privileges);
         }
 
         public override int GetHashCode()

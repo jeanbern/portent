@@ -46,15 +46,16 @@ namespace portent
             Attributes = attributes;
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
-            return obj is LuidAndAttributes other && Equals(other);
+            return obj is LuidAndAttributes other
+                && Equals(other);
         }
 
         public bool Equals(LuidAndAttributes other)
         {
-            return EqualityComparer<Luid>.Default.Equals(Luid, other.Luid) &&
-            this.Attributes == other.Attributes;
+            return EqualityComparer<Luid>.Default.Equals(Luid, other.Luid)
+                && Attributes == other.Attributes;
         }
 
         public override int GetHashCode()
