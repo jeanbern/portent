@@ -235,104 +235,95 @@ namespace JBP
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int ReadCompressedUshort(this Stream stream)
+        public static ushort ReadCompressedUShort(this Stream stream)
         {
-            stream.ReadCompressed(out ushort value);
+            var shift = 0;
+            byte b;
+            ushort value = 0;
+            const int maxRequiredBytes = 7 * ((sizeof(ushort) * 8 / 7) + ((sizeof(ushort) * 8) % 7 == 0 ? 0 : 1));
+            do
+            {
+                b = (byte)stream.ReadByte();
+                if (shift == maxRequiredBytes && b > 0x01)
+                {
+                    Throw(new InvalidOperationException());
+                    return value;
+                }
+
+                value |= (ushort)((b & 0x7F) << shift);
+                shift += 7;
+            } while ((b & 0x80) != 0);
+
             return value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int ReadCompressedInt(this Stream stream)
         {
-            stream.ReadCompressed(out int value);
+            var shift = 0;
+            byte b;
+            int value = 0;
+            const int maxRequiredBytes = 7 * ((sizeof(int) * 8 / 7) + ((sizeof(int) * 8) % 7 == 0 ? 0 : 1));
+            do
+            {
+                b = (byte)stream.ReadByte();
+                if (shift == maxRequiredBytes && b > 0x01)
+                {
+                    Throw(new InvalidOperationException());
+                    return value;
+                }
+
+                value |= (b & 0x7F) << shift;
+                shift += 7;
+            } while ((b & 0x80) != 0);
+
+            return value;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static uint ReadCompressedUInt(this Stream stream)
+        {
+            var shift = 0;
+            byte b;
+            uint value = 0;
+            const int maxRequiredBytes = 7 * ((sizeof(uint) * 8 / 7) + ((sizeof(uint) * 8) % 7 == 0 ? 0 : 1));
+            do
+            {
+                b = (byte)stream.ReadByte();
+                if (shift == maxRequiredBytes && b > 0x01)
+                {
+                    Throw(new InvalidOperationException());
+                    return value;
+                }
+
+                value |= (uint)((b & 0x7F) << shift);
+                shift += 7;
+            } while ((b & 0x80) != 0);
+
             return value;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static long ReadCompressedLong(this Stream stream)
         {
-            stream.ReadCompressed(out long value);
-            return value;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ReadCompressed(this Stream stream, out ushort value)
-        {
             var shift = 0;
             byte b;
-            value = 0;
+            long value = 0;
+            const int maxRequiredBytes = 7 * ((sizeof(long) * 8 / 7) + ((sizeof(long) * 8) % 7 == 0 ? 0 : 1));
             do
             {
                 b = (byte)stream.ReadByte();
-                if (shift == 9 * 7 && b > 0x01)
+                if (shift == maxRequiredBytes && b > 0x01)
                 {
                     Throw(new InvalidOperationException());
-                    return;
-                }
-
-                value |= (ushort)((b & 0x7F) << shift);
-                shift += 7;
-            } while ((b & 0x80) != 0);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ReadCompressed(this Stream stream, out int value)
-        {
-            var shift = 0;
-            byte b;
-            value = 0;
-            do
-            {
-                b = (byte)stream.ReadByte();
-                if (shift == 9 * 7 && b > 0x01)
-                {
-                    value = -1;
-                    return;
-                }
-
-                value |= (b & 0x7F) << shift;
-                shift += 7;
-            } while ((b & 0x80) != 0);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ReadCompressed(this Stream stream, out uint value)
-        {
-            var shift = 0;
-            byte b;
-            value = 0;
-            do
-            {
-                b = (byte)stream.ReadByte();
-                if (shift == 9 * 7 && b > 0x01)
-                {
-                    value = uint.MaxValue;
-                    return;
-                }
-
-                value |= (uint)((b & 0x7F) << shift);
-                shift += 7;
-            } while ((b & 0x80) != 0);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void ReadCompressed(this Stream stream, out long value)
-        {
-            var shift = 0;
-            byte b;
-            value = 0;
-            do
-            {
-                b = (byte)stream.ReadByte();
-                if (shift == 9 * 7 && b > 0x01)
-                {
-                    value = -1;
-                    return;
+                    return value;
                 }
 
                 value |= (long)(b & 0x7F) << shift;
                 shift += 7;
             } while ((b & 0x80) != 0);
+
+            return value;
         }
 
         public static ushort[] ReadCompressedUshortArray(this Stream stream)
@@ -363,7 +354,7 @@ namespace JBP
                 var end = index + length;
                 for (; index < end; index++)
                 {
-                    stream.ReadCompressed(out values[index]);
+                    values[index] = stream.ReadCompressedUShort();
                 }
             }
 
@@ -398,7 +389,7 @@ namespace JBP
                 var end = index + length;
                 for (; index < end; index++)
                 {
-                    stream.ReadCompressed(out values[index]);
+                    values[index] = stream.ReadCompressedInt();
                 }
             }
 
@@ -433,7 +424,7 @@ namespace JBP
                 var end = index + length;
                 for (; index < end; index++)
                 {
-                    stream.ReadCompressed(out values[index]);
+                    values[index] = stream.ReadCompressedUInt();
                 }
             }
 
@@ -469,7 +460,7 @@ namespace JBP
                 var end = index + length;
                 for (; index < end; index++)
                 {
-                    stream.ReadCompressed(out values[index]);
+                    values[index] = stream.ReadCompressedLong();
                 }
             }
 
