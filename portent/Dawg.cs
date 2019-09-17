@@ -892,17 +892,62 @@ namespace portent
             }
         }
 
+        private readonly struct Invariants
+        {
+            public readonly Dawg _dawg;
+            public readonly long* _wordCounts;
+            public readonly int* _firstChildEdgeIndex;
+            public readonly int* _edgeToNodeIndex;
+            public readonly char* _edgeCharacters;
+
+            public Invariants(long* wordCounts, int* firstChildEdgeIndex, char* edgeCharacters, Dawg dawg, int* edgeToNodeIndex)
+            {
+                _wordCounts = wordCounts;
+                _firstChildEdgeIndex = firstChildEdgeIndex;
+                _edgeCharacters = edgeCharacters;
+                _dawg = dawg;
+                _edgeToNodeIndex = edgeToNodeIndex;
+            }
+        }
+
+        private ref struct Variants
+        {
+            public readonly Invariants _invariants;
+            public readonly SuggestItemCollection _results;
+            public readonly int* _const_row0;
+            public readonly int _const_stripeWidth;
+            public readonly int* _toCache;
+            public readonly int _wordLength;
+            public readonly int _maxPlusOne;
+            public readonly char* _const_builder;
+            public readonly char* _first;
+            public int _builderDepth;
+            public int _node;
+            public char _edgeCharacter;
+
+            public Variants(Invariants invariants, SuggestItemCollection results, int* const_row0, int const_stripeWidth, char* first, int* toCache, char* const_builder, int wordLength, int maxPlusOne, char edgeCharacter, int node)
+            {
+                _invariants = invariants;
+                _results = results;
+                _const_row0 = const_row0;
+                _const_stripeWidth = const_stripeWidth;
+                _first = first;
+                _toCache = toCache;
+                _const_builder = const_builder;
+                _wordLength = wordLength;
+                _maxPlusOne = maxPlusOne;
+                _builderDepth = 0;
+                _edgeCharacter = edgeCharacter;
+                _node = node;
+            }
+        }
+
         [LocalsInit(false)]
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         private void SearchWithEdits(int edge, // Not captured
             int maxPlusOne, char* first, int wordLength, int* toCache)
         {
-            var index = _edgeToNodeIndex;
-            var characters = _edgeCharacter;
-            var edgeIndex = _firstChildEdgeIndex;
-            var wordCount = _wordCounts;
-            var results = _compoundResultCollection.Bags[edge - _rootFirstChild];
-
+            ref var invariants = ref Unsafe.AsRef(_invariants);
             // The real stripeWidth is 2*max + 1
             // Normally we would do a bound check and calculate a value for the cell in previousRow directly after our stripe.
             // Instead we pre-assign the cell when we have the values handy and then ignore bound checking.
@@ -918,24 +963,25 @@ namespace portent
                 const_row0[x] = x + 1;
             }
 
-            var builderByteLength = MemoryAlignmentHelper.GetCacheAlignedSize<char>(wordLength + maxPlusOne -1);
+            var builderByteLength = MemoryAlignmentHelper.GetCacheAlignedSize<char>(wordLength + maxPlusOne - 1);
             var builderAlloc = stackalloc byte[builderByteLength];
             var const_builder = MemoryAlignmentHelper.GetCacheAlignedStart<char>(builderAlloc);
 
-            var edgeCharacter = characters[edge];
+            var edgeCharacter = invariants._edgeCharacters[edge];
             const_builder[0] = edgeCharacter;
 
-            var node = index[edge];
-            var builderDepth = 0;
+            var node = invariants._edgeToNodeIndex[edge];
+            var results = _compoundResultCollection.Bags[edge - _rootFirstChild];
+            var variants = new Variants(invariants, results, const_row0, const_stripeWidth, first, toCache, const_builder, wordLength, maxPlusOne, edgeCharacter, node);
 
-            void MatchCharacter(int skip)
+            static void MatchCharacter(ref Variants variants, int skip)
             {
                 // This is the value for the column directly before our diagonal stripe.
                 // It's the one we avoided setting in previousRow earlier.
-                var currentRowPreviousColumn = builderDepth + skip + 1;
+                var currentRowPreviousColumn = variants._builderDepth + skip + 1;
 
-                var previousRow = const_row0 + (builderDepth * const_stripeWidth);
-                var currentRow = previousRow + const_stripeWidth;
+                var previousRow = variants._const_row0 + (variants._builderDepth * variants._const_stripeWidth);
+                var currentRow = previousRow + variants._const_stripeWidth;
 
                 char previousWordCharacter;
                 int previousRowPreviousColumn;
@@ -945,35 +991,35 @@ namespace portent
                 // previousRowOffset == 1 once we have started shifting.
                 int previousRowOffset;
                 // Our stripe ignores early characters once we've gone deep enough.
-                var wordArrayOffset = builderDepth - maxPlusOne + 1;
+                var wordArrayOffset = variants._builderDepth - variants._maxPlusOne;
 
-                if (wordArrayOffset <= 0)
+                if (wordArrayOffset < 0)
                 {
                     // As with currentRowPreviousColumn, this is the cell before our stripe, so it can be computed instead of retrieved.
                     previousRowPreviousColumn = currentRowPreviousColumn - 1;
-                    firstWithOffset = first;
+                    firstWithOffset = variants._first;
                     previousWordCharacter = (char)0;
                     previousRowOffset = 0;
                 }
                 else
                 {
                     previousRowPreviousColumn = previousRow[skip];
-                    firstWithOffset = first + wordArrayOffset;
+                    firstWithOffset = variants._first + wordArrayOffset + 1;
                     previousWordCharacter = firstWithOffset[skip];
                     previousRowOffset = 1;
                 }
 
                 var any = 0;
-                var to = toCache[builderDepth];
+                var to = variants._toCache[variants._builderDepth];
                 for (var j = skip; j < to; ++j)
                 {
                     var previousRowCurrentColumn = previousRow[j + previousRowOffset];
                     var wordCharacter = firstWithOffset[j];
                     var result1 = Math.Min(currentRowPreviousColumn, previousRowCurrentColumn);
-                    if (edgeCharacter != wordCharacter)
+                    if (variants._edgeCharacter != wordCharacter)
                     {
                         var result2 = Math.Min(result1, previousRowPreviousColumn) + 1;
-                        if ((edgeCharacter != previousWordCharacter) || (builderDepth == 0) || (const_builder[builderDepth - 1] != wordCharacter))
+                        if ((variants._edgeCharacter != previousWordCharacter) || (variants._builderDepth == 0) || (variants._const_builder[variants._builderDepth - 1] != wordCharacter))
                         {
                             // Non-match.
                             // Expected case.
@@ -983,24 +1029,24 @@ namespace portent
                         {
                             // Transposition case!
                             // Assert BuilderDepth > 0: Otherwise there is no previous character to transpose.
-                            if (builderDepth == 1)
+                            if (variants._builderDepth == 1)
                             {
                                 // There is no (previousRow - rowWidth). It would be row 0 in the Levenshtein matrix, the one with no letters.
                                 // In this case, the cell value is simply it's column # j
                                 // Use that instead of (previousRow - stripeWidth)[j - 2]
                                 currentRowPreviousColumn = Math.Min(result2, j);
                             }
-                            else if (builderDepth < maxPlusOne)
+                            else if (variants._builderDepth < variants._maxPlusOne)
                             {
                                 // The stripes haven't started shifting yet: look up, move left 2. ((previousrow - rowWidth)[j - 2])
                                 // If we can't move left:
                                 if (j == 1)
                                 {
-                                    currentRowPreviousColumn = Math.Min(result2, builderDepth);
+                                    currentRowPreviousColumn = Math.Min(result2, variants._builderDepth);
                                 }
                                 else
                                 {
-                                    currentRowPreviousColumn = Math.Min(result2, (previousRow - const_stripeWidth)[j - 2] + 1);
+                                    currentRowPreviousColumn = Math.Min(result2, (previousRow - variants._const_stripeWidth)[j - 2] + 1);
                                 }
                             }
                             else
@@ -1008,8 +1054,8 @@ namespace portent
                                 // It's the first stripe shift: look up, move left 1. ((previousrow - rowWidth)[j - 1])
                                 // OR
                                 // At least 2 stripes are shifted: look up. ((previousrow - rowWidth)[j])
-                                var diff = builderDepth == maxPlusOne ? 1 : 0;
-                                currentRowPreviousColumn = Math.Min(result2, (previousRow - const_stripeWidth)[j - diff] + 1);
+                                var diff = variants._builderDepth == variants._maxPlusOne ? 1 : 0;
+                                currentRowPreviousColumn = Math.Min(result2, (previousRow - variants._const_stripeWidth)[j - diff] + 1);
                             }
                         }
                     }
@@ -1024,22 +1070,26 @@ namespace portent
                     previousWordCharacter = wordCharacter;
                     currentRow[j] = currentRowPreviousColumn;
                     // Will make `any` negative if currentRowPreviousColumn > maxErrors
-                    any |= currentRowPreviousColumn - maxPlusOne;
+                    any |= currentRowPreviousColumn - variants._maxPlusOne;
                 }
 
                 if (any >= 0)
                 {
-                    return;
+#pragma warning disable S907 // "goto" statement should not be used - TODO: This one hasn't been tested. The resulting asm is smaller, but performance unknown.
+                    goto singleReturn;
+#pragma warning restore S907 // "goto" statement should not be used
                 }
 
-                if (node < 0 && currentRowPreviousColumn < maxPlusOne && builderDepth + maxPlusOne >= wordLength)
+                if (variants._node < 0 && currentRowPreviousColumn < variants._maxPlusOne && variants._builderDepth + variants._maxPlusOne >= variants._wordLength)
                 {
-                    results.Add(new SuggestItem(new string(const_builder, 0, builderDepth + 1), wordCount[GetIndex(ref Unsafe.AsRef<char>(const_builder), builderDepth + 1)]));
+                    variants._results.Add(new SuggestItem(new string(variants._const_builder, 0, variants._builderDepth + 1), variants._invariants._wordCounts[variants._invariants._dawg.GetIndex(ref Unsafe.AsRef<char>(variants._const_builder), variants._builderDepth + 1)]));
                 }
 
-                if (builderDepth + 2 >= wordLength + maxPlusOne)
+                if (variants._builderDepth + 2 >= variants._wordLength + variants._maxPlusOne)
                 {
-                    return;
+#pragma warning disable S907 // "goto" statement should not be used - TODO: This one hasn't been tested. The resulting asm is smaller, but performance unknown.
+                    goto singleReturn;
+#pragma warning restore S907 // "goto" statement should not be used
                 }
 
                 // We make the strip wider by 1 and avoid bound checking conditionals.
@@ -1050,10 +1100,10 @@ namespace portent
 
                 // Would use a register instead of writing to a variable.
                 var counterSpot = currentRow + skip;
-                if (*counterSpot >= maxPlusOne)
+                if (*counterSpot >= variants._maxPlusOne)
                 {
                     ++counterSpot;
-                    while (counterSpot <= top && *counterSpot >= maxPlusOne)
+                    while (counterSpot <= top && *counterSpot >= variants._maxPlusOne)
                     {
                         ++counterSpot;
                     }
@@ -1061,30 +1111,34 @@ namespace portent
                     skip = (int)(counterSpot - currentRow);
                 }
 
-                if (skip >= toCache[builderDepth + 1])
+                if (skip >= variants._toCache[variants._builderDepth + 1])
                 {
-                    return;
+#pragma warning disable S907 // "goto" statement should not be used - TODO: This one hasn't been tested. The resulting asm is smaller, but performance unknown.
+                    goto singleReturn;
+#pragma warning restore S907 // "goto" statement should not be used
                 }
 
-                var temp = Abs(node);
-                var i = edgeIndex[temp];
-                var last = edgeIndex[temp + 1];
+                var temp = Abs(variants._node);
+                var i = variants._invariants._firstChildEdgeIndex[temp];
+                var last = variants._invariants._firstChildEdgeIndex[temp + 1];
 
-                ++builderDepth;
+                ++variants._builderDepth;
                 for (; i < last; ++i)
                 {
-                    const_builder[builderDepth] = edgeCharacter = characters[i];
-                    node = index[i];
-                    MatchCharacter(skip);
+                    variants._const_builder[variants._builderDepth] = variants._edgeCharacter = variants._invariants._edgeCharacters[i];
+                    variants._node = variants._invariants._edgeToNodeIndex[i];
+                    MatchCharacter(ref variants, skip);
                 }
 
-                // Visual studio might tell you this line is unnecessary. Don't believe it.
-#pragma warning disable IDE0059 // Value assigned to symbol is never used
-                --builderDepth;
+#pragma warning disable IDE0059 // Value assigned to symbol is never used - Visual studio might tell you this line is unnecessary. Don't believe it.
+                --variants._builderDepth;
 #pragma warning restore IDE0059 // Value assigned to symbol is never used
+#pragma warning disable S1116 // Empty statements should be removed - This statement is important. It allows the label/goto to work.
+                singleReturn:;
+#pragma warning restore S1116 // Empty statements should be removed
             }
 
-            MatchCharacter(0);
+            MatchCharacter(ref variants, 0);
         }
 
         [Pure]
@@ -1275,6 +1329,8 @@ namespace portent
 
         private readonly StringBuilder _builder = new StringBuilder(50);
 
+        private readonly Invariants _invariants;
+
         public Dawg(Stream stream) : this(CompressedSparseRowGraph.Read(stream))
         {
         }
@@ -1316,6 +1372,8 @@ namespace portent
             GC.Collect();
 
             _memoryBlock.Lock();
+
+            _invariants = new Invariants(_wordCounts, _firstChildEdgeIndex, _edgeCharacter, this, _edgeToNodeIndex);
         }
 
         public void Dispose()
