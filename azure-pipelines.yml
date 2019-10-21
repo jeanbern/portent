@@ -26,7 +26,7 @@ steps:
   inputs:
     command: test
     projects: portent.Test/portent.Test.csproj
-    arguments: -c $(buildConfiguration) --settings $(System.DefaultWorkingDirectory)/CodeCoverage.runsettings --collect:"XPlat Code Coverage" -- RunConfiguration.DisableAppDomain=true
+    arguments: -c $(buildConfiguration) --collect:"XPlat Code Coverage" -- RunConfiguration.DisableAppDomain=true
   displayName: Run Tests
 
 - task: DotNetCoreCLI@2
