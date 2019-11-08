@@ -1,11 +1,67 @@
 ﻿using System;
 using System.Collections.Generic;
+#if DEBUG
 using System.Diagnostics;
+#endif
 using System.IO;
-using JBP;
+using System.Runtime;
 
 namespace portent
 {
+    public unsafe class CompressedSparseRowPointerGraph
+    {
+        internal readonly LargePageMemoryChunk MemoryChunk;
+        internal readonly int RootNodeIndex;
+        internal readonly uint* FirstChildEdgeIndex;
+        internal readonly int* EdgeToNodeIndex;
+        internal readonly char* EdgeCharacter;
+        internal readonly ushort* ReachableTerminalNodes;
+        internal readonly uint WordCount;
+        internal readonly ulong* WordCounts;
+
+        public static CompressedSparseRowPointerGraph Read(Stream stream)
+        {
+            return new CompressedSparseRowPointerGraph(stream);
+        }
+
+        public CompressedSparseRowPointerGraph(Stream stream)
+        {
+            var totalPageSize = stream.ReadCompressedULong();
+            MemoryChunk = new LargePageMemoryChunk(totalPageSize);
+
+            RootNodeIndex = stream.ReadCompressedInt();
+
+            var firstChildEdgeIndexCount = stream.ReadCompressedUInt();
+            FirstChildEdgeIndex = MemoryChunk.GetArrayAligned<uint>(firstChildEdgeIndexCount);
+            stream.ReadSequentialCompressedUshortToUint(FirstChildEdgeIndex, firstChildEdgeIndexCount);
+
+            var edgeToNodeIndexCount = stream.ReadCompressedUInt();
+            EdgeToNodeIndex = MemoryChunk.GetArrayAligned<int>(edgeToNodeIndexCount);
+            stream.ReadCompressed(EdgeToNodeIndex, edgeToNodeIndexCount);
+
+            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+            GC.Collect();
+
+            var byteLength = stream.ReadCompressedUInt();
+            var charLength = stream.ReadCompressedUInt();
+            EdgeCharacter = MemoryChunk.GetArrayAligned<char>(charLength);
+            stream.ReadUtf8(EdgeCharacter, byteLength, charLength);
+
+            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+            GC.Collect();
+
+            var reachableTerminalNodesCount = stream.ReadCompressedUInt();
+            ReachableTerminalNodes = MemoryChunk.GetArrayAligned<ushort>(reachableTerminalNodesCount);
+            stream.ReadCompressed(ReachableTerminalNodes, reachableTerminalNodesCount);
+
+            WordCount = stream.ReadCompressedUInt();
+            WordCounts = MemoryChunk.GetArrayAligned<ulong>(WordCount);
+            stream.ReadCompressed(WordCounts, WordCount);
+
+            MemoryChunk.Lock();
+        }
+    }
+
     public sealed class CompressedSparseRowGraph
     {
         internal CompressedSparseRowGraph(int rootNodeIndex, uint[] firstChildEdgeIndex, int[] edgeToNodeIndex, char[] edgeCharacter, ushort[] reachableTerminalNodes, ulong[] data, Dictionary<string, ulong> wordCounts)
@@ -49,23 +105,14 @@ namespace portent
                 var nextNode = EdgeToNodeIndex[i];
 
                 var childReachable = AssignCounts(nextNode, builder, builderLength + 1, reachableCount, counts);
+#if DEBUG
                 var realReachable = ReachableTerminalNodes[Math.Abs(nextNode)];
                 Debug.Assert(realReachable == childReachable - reachableCount);
+#endif
                 reachableCount = childReachable;
             }
 
             return reachableCount;
-        }
-
-        public static CompressedSparseRowGraph Read(Stream stream)
-        {
-            return new CompressedSparseRowGraph(
-                stream.Read<int>(),
-                stream.ReadCompressedUIntArray(),
-                stream.ReadArray<int>(),
-                stream.ReadCharArray(),
-                stream.ReadCompressedUshortArray(),
-                stream.ReadCompressedULongArray());
         }
 
         public void Save(string path)
@@ -81,16 +128,25 @@ namespace portent
                 throw new InvalidOperationException();
             }
 
+            var requiredLength = LargePageMemoryChunk.Builder()
+                .ReserveAligned(FirstChildEdgeIndex)
+                .ReserveAligned(EdgeToNodeIndex)
+                .ReserveAligned(EdgeCharacter)
+                .ReserveAligned(ReachableTerminalNodes)
+                .ReserveAligned(WordCounts)
+                .AllocationSize;
+
             using var stream = File.OpenWrite(path);
             if (stream == null)
             {
                 throw new InvalidOperationException();
             }
 
-            stream.Write(RootNodeIndex);
-            stream.WriteCompressed(FirstChildEdgeIndex);
-            stream.Write(EdgeToNodeIndex);
-            stream.Write(EdgeCharacter);
+            stream.WriteCompressed(requiredLength);
+            stream.WriteCompressed(RootNodeIndex);
+            stream.WriteSequentialCompressedToUshort(FirstChildEdgeIndex);
+            stream.WriteCompressed(EdgeToNodeIndex);
+            stream.WriteUtf8(EdgeCharacter);
             stream.WriteCompressed(ReachableTerminalNodes);
             stream.WriteCompressed(WordCounts);
         }

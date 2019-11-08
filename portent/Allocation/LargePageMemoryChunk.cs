@@ -13,7 +13,9 @@ namespace portent
     /// <remarks>
     /// Sets up appropriate privileges if possible, defaulting to VirtualAlloc without large-page support if necessary.
     /// </remarks>
-    /// <see cref="https://docs.microsoft.com/en-us/windows/win32/memory/large-page-support"/>
+    /// <see>
+    /// <cref>https://docs.microsoft.com/en-us/windows/win32/memory/large-page-support</cref>
+    /// </see>
     internal sealed class LargePageMemoryChunk : IDisposable
     {
         private readonly IntPtr _ptr;
@@ -24,35 +26,36 @@ namespace portent
 
         public bool Lock()
         {
-            if (!_locked)
+            if (_locked)
             {
-                var reservedAsPointer = new IntPtr((long) _bytesReserved);
-                var result = NativeMethods.VirtualProtect(_ptr, reservedAsPointer, MemoryProtectionConstants.PageReadonly, out _);
-                result = result && NativeMethods.VirtualLock(_ptr, reservedAsPointer);
-                _locked = result;
+                return _locked;
             }
+
+            var reservedAsPointer = new IntPtr((long) _bytesReserved);
+            var result = NativeMethods.VirtualProtect(_ptr, reservedAsPointer, MemoryProtectionConstants.PageReadonly, out _);
+            result = result && NativeMethods.VirtualLock(_ptr, reservedAsPointer);
+            _locked = result;
 
             return _locked;
         }
 
         /// <summary>
-        /// Reserves part of the memory region and copies into it the elements of a supplied array.
+        /// Reserves part of the memory region for an array of the specififed type and length.
+        /// The part reserved will be aligned on a <see cref="PageAlignmentBytes"/> byte boundary.
         /// </summary>
         /// <typeparam name="T">The type of the array elements.</typeparam>
-        /// <param name="array">The original managed heap array.</param>
-        /// <returns>A pointer to the first item in the new array.</returns>
-        public unsafe T* CopyArrayAligned<T>(T[] array)
+        /// <param name="length">The count of items in the array.</param>
+        /// <returns>A pointer to the first item in the array.</returns>
+        public unsafe T* GetArrayAligned<T>(ulong length)
             where T : unmanaged
         {
-            var lengthInBytes = (ulong) (Unsafe.SizeOf<T>() * array.Length);
-            var necessaryOffset = MemoryAlignmentHelper.RequiredOffset((ulong)_ptr, _offset, lengthInBytes);
+            var lengthInBytes = (ulong) Unsafe.SizeOf<T>() * length;
+            var necessaryOffset = MemoryAlignmentHelper.RequiredOffset((ulong)_ptr, _offset, length);
 
             Debug.Assert(_offset + lengthInBytes + necessaryOffset <= _bytesReserved);
 
-            var result = (T*)(((byte*)_ptr) + _offset + necessaryOffset);
+            var result = (T*)((byte*)_ptr + _offset + necessaryOffset);
             _offset += lengthInBytes + necessaryOffset;
-
-            Unsafe.CopyBlockUnaligned(result, Unsafe.AsPointer(ref array[0]), (uint)lengthInBytes);
 
             return result;
         }
@@ -96,17 +99,19 @@ namespace portent
 
         private void DisposeUnmanaged()
         {
-            if (Interlocked.Increment(ref _disposed) == 1)
+            if (Interlocked.Increment(ref _disposed) != 1)
             {
-                if (_locked)
-                {
-                    var reservedAsPointer = new IntPtr((long) _bytesReserved);
-                    NativeMethods.VirtualProtect(_ptr, reservedAsPointer, MemoryProtectionConstants.PageReadwrite, out _);
-                    NativeMethods.VirtualUnlock(_ptr, reservedAsPointer);
-                }
-
-                NativeMethods.VirtualFree(_ptr, IntPtr.Zero, MemoryFreeType.MemRelease);
+                return;
             }
+
+            if (_locked)
+            {
+                var reservedAsPointer = new IntPtr((long)_bytesReserved);
+                NativeMethods.VirtualProtect(_ptr, reservedAsPointer, MemoryProtectionConstants.PageReadwrite, out _);
+                NativeMethods.VirtualUnlock(_ptr, reservedAsPointer);
+            }
+
+            NativeMethods.VirtualFree(_ptr, IntPtr.Zero, MemoryFreeType.MemRelease);
         }
 
         private static class NativeMethods
@@ -137,7 +142,9 @@ namespace portent
             /// If the function succeeds, the return value is nonzero.
             /// If the function fails, the return value is zero.To get extended error information, call GetLastError.
             /// </returns>
-            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualprotect"/>
+            /// <see>
+            /// <cref>https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualprotect</cref>
+            /// </see>
             [DllImport("kernel32.dll", SetLastError = true)]
             internal static extern bool VirtualProtect(IntPtr lpAddress, IntPtr dwSize, MemoryProtectionConstants flProtect, out MemoryProtectionConstants lpflOldProtect);
 
@@ -156,7 +163,9 @@ namespace portent
             /// If the function succeeds, the return value is nonzero.
             /// If the function fails, the return value is zero.To get extended error information, call GetLastError.
             /// </returns>
-            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtuallock"/>
+            /// <see>
+            /// <cref>https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtuallock</cref>
+            /// </see>
             [DllImport("kernel32.dll", SetLastError = true)]
             internal static extern bool VirtualLock(IntPtr lpAddress, IntPtr dwSize);
 
@@ -175,7 +184,9 @@ namespace portent
             /// If the function succeeds, the return value is nonzero.
             /// If the function fails, the return value is zero. To get extended error information, call GetLastError.
             /// </returns>
-            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualunlock"/>
+            /// <see>
+            /// <cref>https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualunlock</cref>
+            /// </see>
             [DllImport("kernel32.dll", SetLastError = true)]
             internal static extern bool VirtualUnlock(IntPtr lpAddress, IntPtr dwSize);
 
@@ -211,7 +222,9 @@ namespace portent
             /// If the function succeeds, the return value is the base address of the allocated region of pages.
             /// If the function fails, the return value is NULL.To get extended error information, call GetLastError.
             /// </returns>
-            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc"/>
+            /// <see>
+            /// <cref>https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc</cref>
+            /// </see>
             [DllImport("kernel32.dll", EntryPoint = "VirtualAlloc", SetLastError = true)]
             private static extern IntPtr VirtualAllocInterop(IntPtr lpAddress, IntPtr dwSize, MemoryAllocationType flAllocationType, MemoryProtectionConstants flProtect);
 
@@ -314,7 +327,9 @@ namespace portent
             /// If the function succeeds, the return value is nonzero.
             /// If the function fails, the return value is 0 (zero). To get extended error information, call GetLastError.
             /// </returns>
-            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualfree"/>
+            /// <see>
+            /// <cref>https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualfree</cref>
+            /// </see>
             [DllImport("kernel32.dll", EntryPoint = "VirtualFree", SetLastError = true)]
             private static extern bool VirtualFreeInterop(IntPtr lpAddress, IntPtr dwSize, MemoryFreeType dwFreeType);
 

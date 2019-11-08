@@ -1,499 +1,281 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
-using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text;
 using LocalsInit;
 
-namespace JBP
+// ReSharper disable ForCanBeConvertedToForeach
+
+namespace portent
 {
-    /*  This class is a snippet from https://github.com/jeanbern/jeanbern.github.io/blob/master/code/StreamExtensions.cs
-     *  Copyright © 2019 Jean-Bernard Pellerin
-     *  MIT License
-     *  https://github.com/jeanbern/jeanbern.github.io/blob/master/LICENSE
-     */
-    //TODO: The compressed functions suck. Remove the length int that preceeds a run of same-lengthed items.
     public static class StreamExtensions
     {
         private static readonly UTF8Encoding Utf8NoBom = new UTF8Encoding(false, true);
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Write<T>(this Stream stream, T value)
-            where T : unmanaged
-        {
-            var tSpan = MemoryMarshal.CreateSpan(ref value, 1);
-            var span = MemoryMarshal.AsBytes(tSpan);
-            stream.Write(span);
-        }
+        #region Read
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Write<T>(this Stream stream, ref T value)
-            where T : unmanaged
-        {
-            var tSpan = MemoryMarshal.CreateSpan(ref value, 1);
-            var span = MemoryMarshal.AsBytes(tSpan);
-            stream.Write(span);
-        }
+        #region Signed
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Write<T>(this Stream stream, T[] values)
-            where T : unmanaged
+        private static long ReadCompressedSigned(this Stream stream)
         {
-            var tSpan = values.AsSpan();
-            var span = MemoryMarshal.AsBytes(tSpan);
-            stream.Write(values.Length);
-            stream.Write(span);
-        }
-
-        private static int GetCompressedSize(int value)
-        {
-            var length = 1;
-            while (value >= 0x80)
+            var shift = 0;
+            var value = 0UL;
+            var b = (byte)stream.ReadByte();
+            while ((b & 0x80) != 0)
             {
-                length++;
-                value >>= 7;
+                value |= (ulong)(b & 0x7F) << shift;
+                shift += 7;
+                b = (byte)stream.ReadByte();
             }
 
-            return length;
-        }
+            value |= (ulong)(b & 0x3f) << shift;
 
-        private static int GetCompressedSize(uint value)
-        {
-            var length = 1;
-            while (value >= 0x80)
+            if ((b & 0x40) == 0)
             {
-                length++;
-                value >>= 7;
+                return (long) value;
             }
 
-            return length;
-        }
-
-        private static int GetCompressedSize(ulong value)
-        {
-            var length = 1;
-            while (value >= 0x80)
+            if (value != 0)
             {
-                length++;
-                value >>= 7;
+                return -(long) value;
             }
 
-            return length;
+            return long.MinValue;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteCompressed(this Stream stream, Span<ushort> values)
+        public static int ReadCompressedInt(this Stream stream)
         {
-            stream.WriteCompressed(values.Length);
+            return (int) stream.ReadCompressedSigned();
+        }
 
-            var startIndex = 0;
-            while (startIndex < values.Length)
+        public static unsafe void ReadCompressed(this Stream stream, int* pointer, uint count)
+        {
+            while (count > 0)
             {
-                var endIndex = startIndex;
-                var current = values[startIndex];
-                var valueSize = GetCompressedSize(current);
-                endIndex++;
-                while (endIndex < values.Length && valueSize == GetCompressedSize(values[endIndex]))
-                {
-                    endIndex++;
-                }
-
-                stream.WriteCompressed(valueSize);
-
-                stream.WriteCompressed(endIndex - startIndex);
-
-                while (startIndex < endIndex)
-                {
-                    stream.WriteCompressed(values[startIndex]);
-                    startIndex++;
-                }
+                *pointer = stream.ReadCompressedInt();
+                pointer++;
+                count--;
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteCompressed(this Stream stream, Span<int> values)
+        #endregion Signed
+
+        #region Unsigned
+
+        private static ulong ReadCompressedUnsigned(this Stream stream)
         {
-            stream.WriteCompressed(values.Length);
-
-            var startIndex = 0;
-            while (startIndex < values.Length)
+            var shift = 0;
+            var value = 0UL;
+            int read;
+            do
             {
-                var endIndex = startIndex;
-                var current = values[startIndex];
-                var valueSize = GetCompressedSize(current);
-                endIndex++;
-                while (endIndex < values.Length && valueSize == GetCompressedSize(values[endIndex]))
+                read = stream.ReadByte();
+                if (read == -1)
                 {
-                    endIndex++;
+                    Throw(new EndOfStreamException());
                 }
 
-                stream.WriteCompressed(valueSize);
+                value |= (ulong)(read & 0x7F) << shift;
+                shift += 7;
+            } while (read >= 0x80);
 
-                stream.WriteCompressed(endIndex - startIndex);
+            return value;
+        }
 
-                while (startIndex < endIndex)
-                {
-                    stream.WriteCompressed(values[startIndex]);
-                    startIndex++;
-                }
+        public static ushort ReadCompressedUShort(this Stream stream)
+        {
+            var b = stream.ReadByte();
+            if (b == -1)
+            {
+                Throw(new EndOfStreamException());
+            }
+
+            if (b < 0x80)
+            {
+                return (ushort) b;
+            }
+
+            var b2 = stream.ReadByte();
+            if (b2 == -1)
+            {
+                Throw(new EndOfStreamException());
+            }
+
+            var result = (b2 << 7) | (b & 0x3f);
+            if (result < 0x8000)
+            {
+                return (ushort) result;
+            }
+
+            var b3 = stream.ReadByte();
+            if (b3 == -1)
+            {
+                Throw(new EndOfStreamException());
+            }
+
+            return (ushort) ((b3 << 14) | (result & 0x3fff));
+        }
+
+        public static uint ReadCompressedUInt(this Stream stream)
+        {
+            return (uint) ReadCompressedULong(stream);
+        }
+
+        public static ulong ReadCompressedULong(this Stream stream)
+        {
+            return ReadCompressedUnsigned(stream);
+        }
+
+        public static unsafe void ReadCompressed(this Stream stream, ushort* pointer, uint count)
+        {
+            while (count > 0)
+            {
+                *pointer = stream.ReadCompressedUShort();
+                pointer++;
+                count--;
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteCompressed(this Stream stream, Span<uint> values)
+        public static unsafe void ReadCompressed(this Stream stream, ulong* pointer, uint count)
         {
-            stream.WriteCompressed(values.Length);
-
-            var startIndex = 0;
-            while (startIndex < values.Length)
+            while (count > 0)
             {
-                var endIndex = startIndex;
-                var current = values[startIndex];
-                var valueSize = GetCompressedSize(current);
-                endIndex++;
-                while (endIndex < values.Length && valueSize == GetCompressedSize(values[endIndex]))
-                {
-                    endIndex++;
-                }
-
-                stream.WriteCompressed(valueSize);
-
-                stream.WriteCompressed(endIndex - startIndex);
-
-                while (startIndex < endIndex)
-                {
-                    stream.WriteCompressed(values[startIndex]);
-                    startIndex++;
-                }
+                *pointer = stream.ReadCompressedULong();
+                pointer++;
+                count--;
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteCompressed(this Stream stream, Span<ulong> values)
+        public static unsafe void ReadSequentialCompressedUshortToUint(this Stream stream, uint* pointer, uint count)
         {
-            stream.WriteCompressed(values.Length);
-
-            var startIndex = 0;
-            while (startIndex < values.Length)
+            var currentValue = 0u;
+            while (count > 0)
             {
-                var endIndex = startIndex;
-                var current = values[startIndex];
-                var valueSize = GetCompressedSize(current);
-                endIndex++;
-                while (endIndex < values.Length && valueSize == GetCompressedSize(values[endIndex]))
-                {
-                    endIndex++;
-                }
-
-                stream.WriteCompressed(valueSize);
-
-                stream.WriteCompressed(endIndex - startIndex);
-
-                while (startIndex < endIndex)
-                {
-                    stream.WriteCompressed(values[startIndex]);
-                    startIndex++;
-                }
+                var stepValue = stream.ReadCompressedUShort();
+                currentValue += stepValue;
+                *pointer = currentValue;
+                pointer++;
+                count--;
             }
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteCompressed(this Stream stream, ushort value)
-        {
-            while (value >= 0x80)
-            {
-                stream.WriteByte((byte)(value | 0x80));
-                value >>= 7;
-            }
+        #endregion Unsigned
 
-            stream.WriteByte((byte)value);
+        public static unsafe void ReadUtf8(this Stream stream, char* pointer, uint byteLength, uint charLength)
+        {
+            Span<byte> span = stackalloc byte[(int) byteLength];
+            stream.Read(span);
+            var spp = new Span<char>(pointer, (int) charLength);
+            Utf8NoBom.GetChars(span, spp);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        #endregion Read
+
+        #region Write
+
+        #region Signed
+
         public static void WriteCompressed(this Stream stream, int value)
         {
-            while (value >= 0x80)
+            WriteCompressed(stream, (long) value);
+        }
+
+        private static void WriteCompressed(this Stream stream, long value)
+        {
+            var negative = false;
+            if (value < 0)
+            {
+                negative = true;
+                value = -value;
+            }
+
+            while (value >= 0x40)
             {
                 stream.WriteByte((byte)(value | 0x80));
                 value >>= 7;
             }
 
+            if (negative)
+            {
+                value |= 0x40;
+            }
+
             stream.WriteByte((byte)value);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static void WriteCompressed(this Stream stream, Span<int> values)
+        {
+            stream.WriteCompressed((uint) values.Length);
+            for (var i = 0; i < values.Length; i++)
+            {
+                stream.WriteCompressed(values[i]);
+            }
+        }
+
+        #endregion Signed
+
+        #region Unsigned
+
+        public static void WriteCompressed(this Stream stream, ushort value)
+        {
+            stream.WriteCompressed((ulong)value);
+        }
+
+        public static void WriteCompressed(this Stream stream, uint value)
+        {
+            stream.WriteCompressed((ulong)value);
+        }
+
         public static void WriteCompressed(this Stream stream, ulong value)
         {
             while (value >= 0x80)
             {
-                stream.WriteByte((byte)(value | 0x80));
+                var byteToWrite = (byte) ((value & 0x7f) | 0x80);
+                stream.WriteByte(byteToWrite);
                 value >>= 7;
             }
 
             stream.WriteByte((byte)value);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ushort ReadCompressedUShort(this Stream stream)
+        public static void WriteCompressed(this Stream stream, Span<ushort> values)
         {
-            var shift = 0;
-            byte b;
-            ushort value = 0;
-            const int maxRequiredBytes = 7 * ((sizeof(ushort) * 8 / 7) + ((sizeof(ushort) * 8) % 7 == 0 ? 0 : 1));
-            do
+            stream.WriteCompressed((uint) values.Length);
+            for (var i = 0; i < values.Length; i++)
             {
-                b = (byte)stream.ReadByte();
-                if (shift == maxRequiredBytes && b > 0x01)
-                {
-                    Throw(new InvalidOperationException());
-                    return value;
-                }
-
-                value |= (ushort)((b & 0x7F) << shift);
-                shift += 7;
-            } while ((b & 0x80) != 0);
-
-            return value;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int ReadCompressedInt(this Stream stream)
-        {
-            var shift = 0;
-            byte b;
-            int value = 0;
-            const int maxRequiredBytes = 7 * ((sizeof(int) * 8 / 7) + ((sizeof(int) * 8) % 7 == 0 ? 0 : 1));
-            do
-            {
-                b = (byte)stream.ReadByte();
-                if (shift == maxRequiredBytes && b > 0x01)
-                {
-                    Throw(new InvalidOperationException());
-                    return value;
-                }
-
-                value |= (b & 0x7F) << shift;
-                shift += 7;
-            } while ((b & 0x80) != 0);
-
-            return value;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static uint ReadCompressedUInt(this Stream stream)
-        {
-            var shift = 0;
-            byte b;
-            uint value = 0;
-            const int maxRequiredBytes = 7 * ((sizeof(uint) * 8 / 7) + ((sizeof(uint) * 8) % 7 == 0 ? 0 : 1));
-            do
-            {
-                b = (byte)stream.ReadByte();
-                if (shift == maxRequiredBytes && b > 0x01)
-                {
-                    Throw(new InvalidOperationException());
-                    return value;
-                }
-
-                value |= (uint)((b & 0x7F) << shift);
-                shift += 7;
-            } while ((b & 0x80) != 0);
-
-            return value;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static ulong ReadCompressedLong(this Stream stream)
-        {
-            var shift = 0;
-            byte b;
-            ulong value = 0;
-            const int maxRequiredBytes = 7 * ((sizeof(long) * 8 / 7) + ((sizeof(long) * 8) % 7 == 0 ? 0 : 1));
-            do
-            {
-                b = (byte)stream.ReadByte();
-                if (shift == maxRequiredBytes && b > 0x01)
-                {
-                    Throw(new InvalidOperationException());
-                    return value;
-                }
-
-                value |= (ulong)(b & 0x7F) << shift;
-                shift += 7;
-            } while ((b & 0x80) != 0);
-
-            return value;
-        }
-
-        public static ushort[] ReadCompressedUshortArray(this Stream stream)
-        {
-            var count = stream.ReadCompressedInt();
-            if (count == 0)
-            {
-                return Array.Empty<ushort>();
+                stream.WriteCompressed(values[i]);
             }
-
-            var values = new ushort[count];
-
-            var index = 0;
-            while (index < count)
-            {
-                var size = stream.ReadCompressedInt();
-                if (size == 0)
-                {
-                    Throw(new InvalidOperationException());
-                }
-
-                if (size == sizeof(ushort))
-                {
-                    //TODO: shortcut to reading directly into memory.
-                }
-
-                var length = stream.ReadCompressedInt();
-                var end = index + length;
-                for (; index < end; index++)
-                {
-                    values[index] = stream.ReadCompressedUShort();
-                }
-            }
-
-            return values;
         }
 
-        public static int[] ReadCompressedIntArray(this Stream stream)
+        public static void WriteCompressed(this Stream stream, Span<ulong> values)
         {
-            var count = stream.ReadCompressedInt();
-            if (count == 0)
+            stream.WriteCompressed((uint) values.Length);
+            for (var i = 0; i < values.Length; i++)
             {
-                return Array.Empty<int>();
+                stream.WriteCompressed(values[i]);
             }
-
-            var values = new int[count];
-
-            var index = 0;
-            while (index < count)
-            {
-                var size = stream.ReadCompressedInt();
-                if (size == 0)
-                {
-                    Throw(new InvalidOperationException());
-                }
-
-                if (size == sizeof(int))
-                {
-                    //TODO: shortcut to reading directly into memory.
-                }
-
-                var length = stream.ReadCompressedInt();
-                var end = index + length;
-                for (; index < end; index++)
-                {
-                    values[index] = stream.ReadCompressedInt();
-                }
-            }
-
-            return values;
         }
 
-        public static uint[] ReadCompressedUIntArray(this Stream stream)
+        public static void WriteSequentialCompressedToUshort(this Stream stream, Span<uint> values)
         {
-            var count = stream.ReadCompressedInt();
-            if (count == 0)
+            stream.WriteCompressed((uint) values.Length);
+            var previous = 0u;
+
+            for (var i = 0; i < values.Length; i++)
             {
-                return Array.Empty<uint>();
+                var current = values[i];
+                var difference = current - previous;
+                previous = current;
+                stream.WriteCompressed((ushort) difference);
             }
-
-            var values = new uint[count];
-
-            var index = 0;
-            while (index < count)
-            {
-                var size = stream.ReadCompressedInt();
-                if (size == 0)
-                {
-                    Throw(new InvalidOperationException());
-                }
-
-                if (size == sizeof(uint))
-                {
-                    //TODO: shortcut to reading directly into memory.
-                }
-
-                var length = stream.ReadCompressedInt();
-                var end = index + length;
-                for (; index < end; index++)
-                {
-                    values[index] = stream.ReadCompressedUInt();
-                }
-            }
-
-            return values;
         }
 
-        //TODO: this method sucks
-        public static ulong[] ReadCompressedULongArray(this Stream stream)
-        {
-            var count = stream.ReadCompressedInt();
-            if (count == 0)
-            {
-                return Array.Empty<ulong>();
-            }
-
-            var values = AllocateUninitializedArray<ulong>(count);
-
-            var index = 0;
-            while (index < count)
-            {
-                var size = stream.ReadCompressedInt();
-                if (size == 0)
-                {
-                    Throw(new InvalidOperationException());
-                }
-
-                if (size == sizeof(long))
-                {
-                    //TODO: shortcut to reading directly into memory.
-                }
-
-                var length = stream.ReadCompressedInt();
-                var end = index + length;
-                for (; index < end; index++)
-                {
-                    values[index] = stream.ReadCompressedLong();
-                }
-            }
-
-            return values;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Write<T>(this Stream stream, Span<T> values)
-            where T : unmanaged
-        {
-            var span = MemoryMarshal.AsBytes(values);
-            stream.Write(values.Length);
-            stream.Write(span);
-        }
+        #endregion Unsigned
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         [LocalsInit(false)]
-        public static void Write(this Stream stream, string value)
-        {
-            var encoding = Utf8NoBom;
-            var valueSpan = value.AsSpan();
-            var len = encoding.GetByteCount(valueSpan);
-
-            Span<byte> byteSpan = stackalloc byte[len];
-            var encodedLen = encoding.GetBytes(valueSpan, byteSpan);
-
-            stream.Write(encodedLen);
-            stream.Write(byteSpan);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        [LocalsInit(false)]
-        public static void Write(this Stream stream, char[] value)
+        public static void WriteUtf8(this Stream stream, char[] value)
         {
             var encoding = Utf8NoBom;
             var valueSpan = value.AsSpan();
@@ -502,137 +284,15 @@ namespace JBP
             Span<byte> byteSpan = stackalloc byte[encodedLength];
             var byteLength = encoding.GetBytes(valueSpan, byteSpan);
 
-            stream.Write(byteLength);
-            stream.Write(value.Length);
+            stream.WriteCompressed((uint) byteLength);
+            stream.WriteCompressed((uint) value.Length);
             stream.Write(byteSpan);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void Read<T>(this Stream stream, ref T result)
-            where T : unmanaged
-        {
-            var tSpan = MemoryMarshal.CreateSpan(ref result, 1);
-            var span = MemoryMarshal.AsBytes(tSpan);
-            stream.Read(span);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static T Read<T>(this Stream stream)
-            where T : unmanaged
-        {
-            var result = default(T);
-            var tSpan = MemoryMarshal.CreateSpan(ref result, 1);
-            var span = MemoryMarshal.AsBytes(tSpan);
-            stream.Read(span);
-            return result;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        [LocalsInit(false)]
-        public static char[] ReadCharArray(this Stream stream)
-        {
-            var byteLength = stream.Read<int>();
-            var charLength = stream.Read<int>();
-
-            Span<byte> span = stackalloc byte[byteLength];
-            stream.Read(span);
-
-            var results = AllocateUninitializedArray<char>(charLength);
-            var charSpan = results.AsSpan();
-            Utf8NoBom.GetChars(span, charSpan);
-
-            return results;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        [LocalsInit(false)]
-        public static string ReadString(this Stream stream)
-        {
-            var byteLength = stream.Read<int>();
-            Span<byte> bytes = stackalloc byte[byteLength];
-            stream.Read(bytes);
-            var result = Utf8NoBom.GetString(bytes);
-            return result ?? string.Empty;
-        }
-
-        // Skips zero-initialization of the array if possible. If T contains object references,
-        // the array is always zero-initialized.
-        private static T[] AllocateUninitializedArray<T>(int length)
-            where T : unmanaged
-        {
-            // TODO: Probably unnecessary because of the unmanaged constraint
-            if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
-            {
-                return new T[length];
-            }
-
-            if (length == 0)
-            {
-                Throw(new ArgumentOutOfRangeException(nameof(length)));
-            }
-
-            if (Unsafe.SizeOf<T>() * length < 256 - (3 * IntPtr.Size))
-            {
-                return new T[length];
-            }
-
-            return TypeAllocator<T>.AllocateUninitializedArrayInternal(length);
-        }
-
-        private static class TypeAllocator<T>
-        {
-            public static T[] AllocateUninitializedArrayInternal(int length)
-            {
-                if (!(MethodInfo.Invoke(null, new object[] { length }) is T[] result))
-                {
-                    Throw(new InvalidOperationException());
-                    //For compiler to shut up
-                    return Array.Empty<T>();
-                }
-
-                return result;
-            }
-
-            private static readonly MethodInfo MethodInfo = GetAllocationMethod().MakeGenericMethod(new [] { typeof(T) });
-
-            //TODO: HAHAHAHAHA very hacky indeed
-            private static MethodInfo GetAllocationMethod()
-            {
-                var t = typeof(GC);
-                foreach (var mi in t.GetMethods(BindingFlags.NonPublic | BindingFlags.Static))
-                {
-                    if (string.Equals(mi.Name, "AllocateUninitializedArray", StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        return mi;
-                    }
-                }
-
-                throw new InvalidOperationException();
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static T[] ReadArray<T>(this Stream stream)
-            where T : unmanaged
-        {
-            if (typeof(T) == typeof(char))
-            {
-                Throw(new InvalidCastException("ReadArray<char>() should be replaced with a call to ReadCharArray()."));
-            }
-
-            var length = stream.Read<int>();
-
-            var results = AllocateUninitializedArray<T>(length);
-
-            var tSpan = results.AsSpan();
-            var span = MemoryMarshal.AsBytes(tSpan);
-            stream.Read(span);
-
-            return results;
-        }
+        #endregion Write
 
         //https://reubenbond.github.io/posts/dotnet-perf-tuning Section: Use static throw helpers
-        //[DoesNotReturn]
+        [Conditional("DEBUG")]
         private static void Throw(Exception e)
         {
             throw e;

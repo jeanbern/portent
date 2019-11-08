@@ -1307,7 +1307,7 @@ namespace portent
             return (value + mask) ^ mask;
         }
 
-        public int Count { get; }
+        public uint Count { get; }
 
         private readonly int _rootNodeIndex;
         private readonly uint _rootFirstChild;
@@ -1331,35 +1331,22 @@ namespace portent
 
         private readonly Invariants _invariants;
 
-        public Dawg(Stream stream) : this(CompressedSparseRowGraph.Read(stream))
+        public Dawg(Stream stream) : this(CompressedSparseRowPointerGraph.Read(stream))
         {
         }
 
-        [SuppressMessage("Critical Code Smell", "S1215:\"GC.Collect\" should not be called", Justification = "This method allocates multiple large arrays in the Large Object Heap")]
-        public Dawg(CompressedSparseRowGraph compressedSparseRows)
+        public Dawg(CompressedSparseRowPointerGraph compressedSparseRows)
         {
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
-
             _rootNodeIndex = compressedSparseRows.RootNodeIndex;
-            Count = compressedSparseRows.WordCounts.Length;
+            Count = compressedSparseRows.WordCount;
 
-            _memoryBlock = LargePageMemoryChunk.Builder()
-                .ReserveAligned(compressedSparseRows.FirstChildEdgeIndex)
-                .ReserveAligned(compressedSparseRows.EdgeToNodeIndex)
-                .ReserveAligned(compressedSparseRows.EdgeCharacter)
-                .ReserveAligned(compressedSparseRows.ReachableTerminalNodes)
-                .ReserveAligned(compressedSparseRows.WordCounts)
-                .Allocate();
+            _memoryBlock = compressedSparseRows.MemoryChunk;
 
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
-
-            _firstChildEdgeIndex = _memoryBlock.CopyArrayAligned(compressedSparseRows.FirstChildEdgeIndex);
-            _edgeToNodeIndex = _memoryBlock.CopyArrayAligned(compressedSparseRows.EdgeToNodeIndex);
-            _edgeCharacter = _memoryBlock.CopyArrayAligned(compressedSparseRows.EdgeCharacter);
-            _reachableTerminalNodes = _memoryBlock.CopyArrayAligned(compressedSparseRows.ReachableTerminalNodes);
-            _wordCounts = _memoryBlock.CopyArrayAligned(compressedSparseRows.WordCounts);
+            _firstChildEdgeIndex = compressedSparseRows.FirstChildEdgeIndex;
+            _edgeToNodeIndex = compressedSparseRows.EdgeToNodeIndex;
+            _edgeCharacter = compressedSparseRows.EdgeCharacter;
+            _reachableTerminalNodes = compressedSparseRows.ReachableTerminalNodes;
+            _wordCounts = compressedSparseRows.WordCounts;
 
             _rootFirstChild = _firstChildEdgeIndex[_rootNodeIndex];
             _rootLastChild = _firstChildEdgeIndex[_rootNodeIndex + 1];

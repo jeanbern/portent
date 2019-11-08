@@ -7,14 +7,23 @@
     <PlatformTarget>x64</PlatformTarget>
     <NullableContextOptions>enable</NullableContextOptions>
     <Nullable>enable</Nullable>
+    <DefineConstants>DEBUG;TRACE;BIT64</DefineConstants>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DebugType>pdbonly</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="BenchmarkDotNet" Version="0.11.5" />
+    <PackageReference Include="BenchmarkDotNet" Version="0.12.0" />
+    <PackageReference Include="BenchmarkDotNet.Diagnostics.Windows" Version="0.12.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\portent\portent.csproj" />
+    <ProjectReference Include="..\portent\Portent.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -25,5 +34,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="&quot;C:\Program Files\PowerShell\6\pwsh.exe&quot; -ExecutionPolicy ByPass C:\doctemp\signingScript.ps1 -filepath &quot;$(TargetPath)&quot;&#xD;&#xA;&quot;C:\Program Files\PowerShell\6\pwsh.exe&quot; -ExecutionPolicy ByPass C:\doctemp\signingScript.ps1 -filepath &quot;$(TargetDir)$(TargetName).exe&quot;" />
+  </Target>
 
 </Project>

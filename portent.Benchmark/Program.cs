@@ -1,9 +1,7 @@
-﻿#if DEBUG
+﻿using BenchmarkDotNet.Running;
 using System;
+using System.Diagnostics;
 using System.Linq;
-#else
-using BenchmarkDotNet.Running;
-#endif
 
 namespace portent.Benchmark
 {
@@ -11,27 +9,40 @@ namespace portent.Benchmark
     {
         public static void Main()
         {
-#if DEBUG
+            if (Debugger.IsAttached)
+            {
+                RunForProfiler();
+            }
+            else
+            {
+                BenchmarkRunner.Run<DawgBenchmark>();
+            }
+        }
+
+        private static void RunForProfiler()
+        {
+            Console.WriteLine("reading");
             using var benchmark = new DawgBenchmark(false);
+            Console.WriteLine("setup for run");
             benchmark.SetupForRun();
+            Console.WriteLine("verify correctness");
             if (!benchmark.VerifyDawgCorrectness())
             {
                 throw new InvalidOperationException();
             }
 
-            // 497, 34814, 869864, 8775261
-            for (var i = 0u; i < 4; i++)
+            var results = string.Join(", ", benchmark._dawg.Lookup("adventures", 3).Select(x => x.Term));
+            Console.WriteLine(results);
+
+            for (var i = 0u; i < 4u; i++)
             {
                 benchmark.MaxErrors = i;
                 Console.WriteLine(benchmark.GetTotalResults());
 
             }
 
-            Console.WriteLine("No errors, press {ENTER} to continue...");
+            Console.WriteLine("Done, press {ENTER} to continue...");
             Console.ReadLine();
-#else
-            BenchmarkRunner.Run<DawgBenchmark>();
-#endif
         }
     }
 }

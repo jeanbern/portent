@@ -3,24 +3,21 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Runtime;
-using System.Diagnostics.CodeAnalysis;
 
 namespace portent.Benchmark
 {
     public class DawgBenchmark : IDisposable
     {
         // Backtrack from /bin/$(Configuration)/netcore3.0/
-        private const string SaveLocation = "../../../lev7.aug";
-        private const string Query1K = "../../../noisy_query_en_1000.txt";
+        private const string SaveLocation = @"C:\Users\JPelleri\source\repos\portent\portent.Benchmark\lev7.augv5";
+        private const string Query1K = @"C:\Users\JPelleri\source\repos\portent\portent.Benchmark\noisy_query_en_1000.txt";
 
-        private readonly Dawg _dawg;
+        internal readonly Dawg _dawg;
         private readonly string[] _words;
 
         public DawgBenchmark(bool fromBenchmarkRunner)
         {
-            //Add a another level for the BenchmarkDotNet GUID folder
-            var prefix = fromBenchmarkRunner ? "../" : string.Empty;
-
+            var prefix = string.Empty;
             using var dawgStream = File.OpenRead(prefix + SaveLocation);
             _dawg = new Dawg(dawgStream);
             using var queryStream = File.OpenRead(prefix + Query1K);
@@ -29,10 +26,6 @@ namespace portent.Benchmark
 
         public DawgBenchmark() : this(true)
         {
-            if (!VerifyDawgCorrectness())
-            {
-                throw new InvalidOperationException("Dawg was not well formed.");
-            }
         }
 
         private static string[] BuildQuery1K(Stream stream)
@@ -50,7 +43,7 @@ namespace portent.Benchmark
             while ((line = reader.ReadLine()) != null)
             {
                 var lineParts = line.Split(default(char[]), StringSplitOptions.None);
-                if (lineParts?.Length == 3)
+                if (lineParts.Length == 3)
                 {
                     testList[i++] = lineParts[0];
                 }
@@ -95,14 +88,14 @@ namespace portent.Benchmark
 
             var compressedGraph = builder.AsCompressedSparseRows();
             compressedGraph.Save(savePath);
-            return new Dawg(compressedGraph);
+            using var dawgStream = File.OpenRead(savePath);
+            return new Dawg(dawgStream);
         }
 
-        [Params(0, 1, 2, 3)]
+        [Params(3u)]
         public uint MaxErrors { get; set; }
 
         [GlobalSetup]
-        [SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Used via reflection by DotNetBenchmark")]
         public void SetupForRun()
         {
             GCSettings.LatencyMode = GCLatencyMode.Batch;
@@ -144,7 +137,7 @@ namespace portent.Benchmark
             }
         }
 
-        #region IDisposable Support
+#region IDisposable Support
         private bool _disposedValue;
 
         protected virtual void Dispose(bool disposing)
@@ -165,6 +158,6 @@ namespace portent.Benchmark
             Dispose(true);
             GC.SuppressFinalize(this);
         }
-        #endregion
+#endregion
     }
 }
