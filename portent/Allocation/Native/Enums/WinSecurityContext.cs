@@ -29,7 +29,9 @@ namespace portent
     /// <summary>
     /// // The following two enums ported from WindowsIdentity.cs since it is needed for the impersonation APIs here.
     /// </summary>
-    /// <see cref="https://github.com/dotnet/corefx/blob/master/src/System.Security.AccessControl/src/System/Security/Principal/Win32.cs"/>
+    /// <see>
+    /// <cref>https://github.com/dotnet/corefx/blob/master/src/System.Security.AccessControl/src/System/Security/Principal/Win32.cs</cref>
+    /// </see>
     internal enum WinSecurityContext
     {
         Thread = 1,  // OpenAsSelf = false

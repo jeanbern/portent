@@ -1,12 +1,16 @@
 ﻿using System;
+using JetBrains.Annotations;
 
 namespace portent
 {
     /// <summary>
     /// The type of memory allocation for VirtualAlloc.
     /// </summary>
-    /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc"/>
+    /// <see>
+    /// <cref>https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-virtualalloc</cref>
+    /// </see>
     [Flags]
+    [PublicAPI]
     public enum MemoryAllocationType : uint
     {
         None = 0,
@@ -17,6 +21,6 @@ namespace portent
         MemWriteWatch = 0x00200000,
         MemPhysical = 0x00400000,
         MemResetUndo = 0x01000000,
-        MemLargePages = 0x20000000,
+        MemLargePages = 0x20000000
     }
 }

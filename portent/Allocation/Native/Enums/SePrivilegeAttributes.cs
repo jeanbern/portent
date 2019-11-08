@@ -25,14 +25,18 @@ SOFTWARE.
 */
 
 using System;
+using JetBrains.Annotations;
 
-/// <summary>
-/// Contains values specifying the attributes available for privileges.
-/// </summary>
-/// <see cref="https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.ProcessOptions.cs"/>
 namespace portent
 {
+    /// <summary>
+    /// Contains values specifying the attributes available for privileges.
+    /// </summary>
+    /// <see>
+    /// <cref>https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.ProcessOptions.cs</cref>
+    /// </see>
     [Flags]
+    [PublicAPI]
     public enum SePrivilegeAttributes : uint
     {
         None = 0,

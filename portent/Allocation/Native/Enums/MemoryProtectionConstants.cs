@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Diagnostics.CodeAnalysis;
+using JetBrains.Annotations;
 
 namespace portent
 {
@@ -6,8 +8,12 @@ namespace portent
     /// The following are the memory-protection options; you must specify one of the following values when allocating or protecting a page in memory.
     /// Protection attributes cannot be assigned to a portion of a page; they can only be assigned to a whole page.
     /// </summary>
-    /// <see cref="https://docs.microsoft.com/en-us/windows/win32/memory/memory-protection-constants"/>
+    /// <see>
+    /// <cref>https://docs.microsoft.com/en-us/windows/win32/memory/memory-protection-constants</cref>
+    /// </see>
     [Flags]
+    [PublicAPI]
+    [SuppressMessage("Readability", "RCS1154:Sort enum members.", Justification = "Left as Microsoft had it.")]
     public enum MemoryProtectionConstants : uint
     {
         None = 0,

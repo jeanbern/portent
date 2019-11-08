@@ -35,10 +35,11 @@ namespace portent
     /// <remarks>
     /// This is a special implementation that only contains a single <see cref="LuidAndAttributes"/> privilege.
     /// </remarks>
-    /// <see cref="https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.TOKEN_PRIVILEGE.cs"/>
+    /// <see>
+    /// <cref>https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.TOKEN_PRIVILEGE.cs</cref>
+    /// </see>
     internal readonly struct TokenPrivilege : IEquatable<TokenPrivilege>
     {
-        public const int Size = 12;
         private const int PrivilegeCountConstant = 1;
 
         public readonly uint PrivilegeCount;

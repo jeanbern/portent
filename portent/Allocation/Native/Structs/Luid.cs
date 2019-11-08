@@ -32,18 +32,14 @@ namespace portent
     /// <summary>
     /// See link for details
     /// </summary>
-    /// <see cref="https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.LUID.cs"/>
+    /// <see>
+    /// <cref>https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.LUID.cs</cref>
+    /// </see>
     [StructLayout(LayoutKind.Sequential)]
     internal readonly struct Luid : IEquatable<Luid>
     {
         internal readonly int LowPart;
         internal readonly int HighPart;
-
-        public Luid(int lowPart, int highPart)
-        {
-            LowPart = lowPart;
-            HighPart = highPart;
-        }
 
         public override bool Equals(object? obj)
         {

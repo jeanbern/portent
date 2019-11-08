@@ -33,7 +33,9 @@ namespace portent
     /// <summary>
     /// See link for details.
     /// </summary>
-    /// <see cref="https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.LUID_AND_ATTRIBUTES.cs"/>
+    /// <see>
+    /// <cref>https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.LUID_AND_ATTRIBUTES.cs</cref>
+    /// </see>
     [StructLayout(LayoutKind.Sequential)]
     internal readonly struct LuidAndAttributes : IEquatable<LuidAndAttributes>
     {

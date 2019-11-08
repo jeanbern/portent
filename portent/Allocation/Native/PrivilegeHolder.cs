@@ -35,17 +35,19 @@ namespace portent
     /// <summary>
     /// Disposable class to manage the lifetime of a token privilege.
     /// </summary>
-    /// <see cref="https://github.com/dotnet/corefx/blob/master/src/System.Security.AccessControl/src/System/Security/AccessControl/Privilege.cs"/>
+    /// <see>
+    /// <cref>https://github.com/dotnet/corefx/blob/master/src/System.Security.AccessControl/src/System/Security/AccessControl/Privilege.cs</cref>
+    /// </see>
     internal sealed class PrivilegeHolder : IDisposable
     {
         private static Luid LuidFromPrivilege(string privilege, out bool success)
         {
-            success = NativeMethods.LookupPrivilegeValue(null, privilege, out Luid luid);
+            success = NativeMethods.LookupPrivilegeValue(null, privilege, out var luid);
             return luid;
         }
 
         [ThreadStatic]
-        private static TlsContents? TtlsSlotData;
+        private static TlsContents? _ttlsSlotData;
 
         private bool _needToRevert;
         private bool _initialState;
@@ -74,7 +76,7 @@ namespace portent
                 false,
                 ref newState,
                 (uint)Unsafe.SizeOf<TokenPrivilege>(),
-                out TokenPrivilege previousState,
+                out var previousState,
                 out _))
             {
                 return Marshal.GetLastWin32Error() == 0;
@@ -118,10 +120,10 @@ namespace portent
                 try
                 {
                     // Retrieve TLS state
-                    var tlsContents = TtlsSlotData;
+                    var tlsContents = _ttlsSlotData;
                     if (tlsContents == null)
                     {
-                        TtlsSlotData = tlsContents = TlsContents.Create();
+                        _ttlsSlotData = tlsContents = TlsContents.Create();
                     }
                     else
                     {
@@ -207,7 +209,7 @@ namespace portent
             }
 
             // This code must be eagerly prepared and non-interruptible.
-            int error = 0;
+            var error = 0;
             try
             {
                 // The payload is entirely in the finally block
@@ -216,7 +218,7 @@ namespace portent
             }
             finally
             {
-                bool success = true;
+                var success = true;
 
                 try
                 {
@@ -284,8 +286,10 @@ namespace portent
             /// If the function succeeds, the function returns nonzero.
             /// If the function fails, it returns zero. To get extended error information, call GetLastError.
             /// </returns>
-            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-lookupprivilegevaluew"/>
-            /// <see cref="https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.LookupPrivilegeValue.cs"/>
+            /// <see>
+            ///     <cref>https://docs.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-lookupprivilegevaluew</cref>
+            ///     <cref>https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.LookupPrivilegeValue.cs</cref>
+            /// </see>
             [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true, BestFitMapping = false, EntryPoint = "LookupPrivilegeValueW")]
             internal static extern bool LookupPrivilegeValue([MarshalAs(UnmanagedType.LPTStr)] string? lpSystemName, [MarshalAs(UnmanagedType.LPTStr)] string lpName, out Luid lpLuid);
 
@@ -330,8 +334,10 @@ namespace portent
             /// <remarks>
             /// This implementation uses <see cref="TokenPrivilege"/> which restricts it to checking one privilege at a time.
             /// </remarks>
-            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-adjusttokenprivileges"/>
-            /// <see cref="https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.AdjustTokenPrivileges.cs"/>
+            /// <see>
+            ///     <cref>https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-adjusttokenprivileges</cref>
+            ///     <cref>https://github.com/dotnet/corefx/blob/master/src/Common/src/Interop/Windows/Advapi32/Interop.AdjustTokenPrivileges.cs</cref>
+            /// </see>
             [DllImport("advapi32.dll", SetLastError = true)]
             internal static extern bool AdjustTokenPrivileges(
                 SafeTokenHandle tokenHandle,
@@ -374,9 +380,11 @@ namespace portent
             /// If the function succeeds, the return value is nonzero.
             /// If the function fails, the return value is zero. To get extended error information, call GetLastError.
             /// </returns>
-            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-gettokeninformation"/>
+            /// <see>
+            /// <cref>https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-gettokeninformation</cref>
+            /// </see>
             [DllImport("advapi32.dll", SetLastError = true)]
-            internal static extern bool GetTokenInformation(
+            private static extern bool GetTokenInformation(
                 SafeTokenHandle tokenHandle,
                 TokenInformationClass tokenInformationClass,
                 ref byte tokenInformation,
@@ -397,9 +405,10 @@ namespace portent
             /// </returns>
             internal static bool HasPrivilege(SafeTokenHandle tokenHandle, in Luid privilegeLuid)
             {
-                const int DefaultPrivilegeCount = 30;
+                const int defaultPrivilegeCount = 30;
                 Debug.Assert(Unsafe.SizeOf<LuidAndAttributes>() == 3 * sizeof(int));
-                var size = sizeof(uint) + (DefaultPrivilegeCount * Unsafe.SizeOf<LuidAndAttributes>());
+                // ReSharper disable once ArrangeRedundantParentheses
+                var size = sizeof(uint) + (defaultPrivilegeCount * Unsafe.SizeOf<LuidAndAttributes>());
                 Span<byte> allocated = stackalloc byte[size];
                 ref var asRef = ref MemoryMarshal.GetReference(allocated);
                 if (GetTokenInformation(tokenHandle,
@@ -409,29 +418,34 @@ namespace portent
                         out var returnLength
                     ))
                 {
-                    Debug.Assert(asRef <= DefaultPrivilegeCount);
+                    Debug.Assert(asRef <= defaultPrivilegeCount);
+                    // ReSharper disable once ArrangeRedundantParentheses
                     Debug.Assert(sizeof(uint) + (asRef * Unsafe.SizeOf<LuidAndAttributes>()) == returnLength);
                     return HasPrivilege(ref Unsafe.As<byte, int>(ref asRef), privilegeLuid);
                 }
 
-                if (returnLength > size)
+                if (returnLength <= size)
                 {
-                    Span<byte> largerAllocated = stackalloc byte[(int)returnLength];
-                    asRef = ref MemoryMarshal.GetReference(largerAllocated);
-                    if (GetTokenInformation(tokenHandle,
-                        TokenInformationClass.TokenPrivileges,
-                        ref asRef,
-                        returnLength,
-                        out var returnLength2
-                    ))
-                    {
-                        Debug.Assert(returnLength == returnLength2);
-                        Debug.Assert(sizeof(uint) + (asRef * Unsafe.SizeOf<LuidAndAttributes>()) == returnLength2);
-                        return HasPrivilege(ref Unsafe.As<byte, int>(ref asRef), privilegeLuid);
-                    }
+                    return false;
                 }
 
-                return false;
+                Span<byte> largerAllocated = stackalloc byte[(int)returnLength];
+                asRef = ref MemoryMarshal.GetReference(largerAllocated);
+                if (!GetTokenInformation(tokenHandle,
+                    TokenInformationClass.TokenPrivileges,
+                    ref asRef,
+                    returnLength,
+                    out var returnLength2
+                ))
+                {
+                    return false;
+                }
+
+                Debug.Assert(returnLength == returnLength2);
+                // ReSharper disable once ArrangeRedundantParentheses
+                Debug.Assert(sizeof(uint) + (asRef * Unsafe.SizeOf<LuidAndAttributes>()) == returnLength2);
+                return HasPrivilege(ref Unsafe.As<byte, int>(ref asRef), privilegeLuid);
+
             }
 
             private static bool HasPrivilege(ref int resultPointer, in Luid privilegeLuid)

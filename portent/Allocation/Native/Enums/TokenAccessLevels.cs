@@ -26,15 +26,19 @@ SOFTWARE.
 
 using System;
 using System.Diagnostics.CodeAnalysis;
+using JetBrains.Annotations;
 
 namespace portent
 {
     /// <summary>
     /// Contains values specifying possible token access levels.
     /// </summary>
-    /// <see cref="https://github.com/dotnet/corefx/blob/master/src/System.Security.Principal.Windows/src/System/Security/Principal/TokenAccessLevels.cs"/>
+    /// <see>
+    /// <cref>https://github.com/dotnet/corefx/blob/master/src/System.Security.Principal.Windows/src/System/Security/Principal/TokenAccessLevels.cs</cref>
+    /// </see>
     [Flags]
     [SuppressMessage("Major Code Smell", "S4070:Non-flags enums should not be marked with \"FlagsAttribute\"", Justification = "Copied from Microsoft.")]
+    [PublicAPI]
     public enum TokenAccessLevels
     {
         AssignPrimary = 0x00000001,

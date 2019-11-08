@@ -1,9 +1,14 @@
-﻿namespace portent
+﻿using JetBrains.Annotations;
+
+namespace portent
 {
     /// <summary>
     /// The TOKEN_INFORMATION_CLASS enumeration contains values that specify the type of information being assigned to or retrieved from an access token.
     /// </summary>
-    /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/winnt/ne-winnt-token_information_class"/>
+    /// <see>
+    /// <cref>https://docs.microsoft.com/en-us/windows/win32/api/winnt/ne-winnt-token_information_class</cref>
+    /// </see>
+    [PublicAPI]
     internal enum TokenInformationClass
     {
         TokenUser = 1,
@@ -31,6 +36,7 @@
         TokenVirtualizationAllowed = 23,
         TokenVirtualizationEnabled = 24,
         TokenIntegrityLevel = 25,
+        // ReSharper disable once InconsistentNaming
         TokenUIAccess = 26,
         TokenMandatoryPolicy = 27,
         TokenLogonSid = 28,

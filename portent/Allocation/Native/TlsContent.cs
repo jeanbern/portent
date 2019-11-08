@@ -32,11 +32,13 @@ namespace portent
     /// <summary>
     /// Disposable class to manage the lifetime of a thread token.
     /// </summary>
-    /// <see cref="https://github.com/dotnet/corefx/blob/master/src/System.Security.AccessControl/src/System/Security/AccessControl/Privilege.cs"/>
+    /// <see>
+    /// <cref>https://github.com/dotnet/corefx/blob/master/src/System.Security.AccessControl/src/System/Security/AccessControl/Privilege.cs</cref>
+    /// </see>
     internal sealed class TlsContents : IDisposable
     {
         private SafeTokenHandle _threadHandle = new SafeTokenHandle(IntPtr.Zero);
-        private static volatile SafeTokenHandle ProcessHandle = new SafeTokenHandle(IntPtr.Zero);
+        private static volatile SafeTokenHandle _processHandle = new SafeTokenHandle(IntPtr.Zero);
         private static readonly object SyncRoot = new object();
 
         public int ReferenceCountValue { get; private set; } = 1;
@@ -50,7 +52,7 @@ namespace portent
             // the process token by impersonating self.
             //
 
-            SafeTokenHandle threadHandleBefore = _threadHandle;
+            var threadHandleBefore = _threadHandle;
             var error = NativeMethods.OpenThreadToken(
                           TokenAccessLevels.Query | TokenAccessLevels.AdjustPrivileges,
                           WinSecurityContext.Process,
@@ -72,7 +74,7 @@ namespace portent
             }
 
             if (!NativeMethods.DuplicateTokenEx(
-                            ProcessHandle,
+                            _processHandle,
                             TokenAccessLevels.Impersonate | TokenAccessLevels.Query | TokenAccessLevels.AdjustPrivileges,
                             IntPtr.Zero,
                             SecurityImpersonationLevel.SecurityImpersonation,
@@ -94,28 +96,26 @@ namespace portent
             return true;
         }
 
-        private TlsContents()
-        {
-
-        }
+        private TlsContents() { }
 
         public static TlsContents? Create()
         {
-            if (ProcessHandle.IsInvalid)
+            if (_processHandle.IsInvalid)
             {
                 lock (SyncRoot)
                 {
-                    if (ProcessHandle.IsInvalid && NativeMethods.OpenProcessToken(
+                    if (_processHandle.IsInvalid && NativeMethods.OpenProcessToken(
                                         NativeMethods.GetCurrentProcess(),
                                         TokenAccessLevels.Duplicate,
-                                        out SafeTokenHandle localProcessHandle))
+                                        out var localProcessHandle))
                     {
-                        ProcessHandle = localProcessHandle;
+                        _processHandle = localProcessHandle;
                     }
                 }
             }
 
             var success = true;
+            // ReSharper disable once SuggestVarOrType_SimpleTypes
             TlsContents? result = new TlsContents();
             try
             {
@@ -163,9 +163,9 @@ namespace portent
                 return;
             }
 
-            if (disposing && _threadHandle != null)
+            if (disposing)
             {
-                _threadHandle.Dispose();
+                _threadHandle?.Dispose();
             }
 
             if (IsImpersonating)
@@ -183,7 +183,7 @@ namespace portent
 
         public int DecrementReferenceCount()
         {
-            int result = --ReferenceCountValue;
+            var result = --ReferenceCountValue;
 
             if (result == 0)
             {
@@ -227,7 +227,9 @@ namespace portent
             /// If the function succeeds, the function returns a nonzero value.
             /// If the function fails, it returns zero.To get extended error information, call GetLastError.
             /// </returns>
-            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-duplicatetokenex"/>
+            /// <see>
+            /// <cref>https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-duplicatetokenex</cref>
+            /// </see>
             [DllImport("advapi32.dll", SetLastError = true)]
             internal static extern bool DuplicateTokenEx(
                 SafeTokenHandle existingTokenHandle,
@@ -244,7 +246,9 @@ namespace portent
             /// If the function succeeds, the return value is nonzero.
             /// If the function fails, the return value is zero.To get extended error information, call GetLastError.
             /// </returns>
-            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-reverttoself"/>
+            /// <see>
+            /// <cref>https://docs.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-reverttoself</cref>
+            /// </see>
             [DllImport("advapi32.dll", SetLastError = true, ExactSpelling = true, CharSet = CharSet.Unicode)]
             internal static extern bool RevertToSelf();
 
@@ -266,7 +270,9 @@ namespace portent
             /// If the function succeeds, the return value is nonzero.
             /// If the function fails, the return value is zero. To get extended error information, call GetLastError.
             /// </returns>
-            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openprocesstoken"/>
+            /// <see>
+            /// <cref>https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openprocesstoken</cref>
+            /// </see>
             [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
             internal static extern bool OpenProcessToken(IntPtr processToken, TokenAccessLevels desiredAccess, out SafeTokenHandle tokenHandle);
 
@@ -276,7 +282,9 @@ namespace portent
             /// <returns>
             /// The return value is a pseudo handle to the current process.
             /// </returns>
-            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getcurrentprocess"/>
+            /// <see>
+            /// <cref>https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getcurrentprocess</cref>
+            /// </see>
             [DllImport("kernel32.dll", CallingConvention = CallingConvention.StdCall, EntryPoint = "GetCurrentProcess", CharSet = CharSet.Unicode)]
             public static extern IntPtr GetCurrentProcess();
 
@@ -305,7 +313,9 @@ namespace portent
             /// To get extended error information, call GetLastError.
             /// If the token has the anonymous impersonation level, the token will not be opened and OpenThreadToken sets ERROR_CANT_OPEN_ANONYMOUS as the error.
             /// </returns>
-            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openthreadtoken"/>
+            /// <see>
+            /// <cref>https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openthreadtoken</cref>
+            /// </see>
             [DllImport("advapi32.dll", SetLastError = true)]
             private static extern bool OpenThreadToken(IntPtr threadHandle, TokenAccessLevels dwDesiredAccess, bool bOpenAsSelf, out SafeTokenHandle phThreadToken);
 
@@ -329,7 +339,9 @@ namespace portent
             /// To get extended error information, call GetLastError.
             /// If the token has the anonymous impersonation level, the token will not be opened and OpenThreadToken sets ERROR_CANT_OPEN_ANONYMOUS as the error.
             /// </returns>
-            /// <see cref="https://github.com/dotnet/corefx/blob/master/src/System.Security.AccessControl/src/System/Security/Principal/Win32.cs"/>
+            /// <see>
+            /// <cref>https://github.com/dotnet/corefx/blob/master/src/System.Security.AccessControl/src/System/Security/Principal/Win32.cs</cref>
+            /// </see>
             internal static int OpenThreadToken(TokenAccessLevels dwDesiredAccess, WinSecurityContext dwOpenAs, out SafeTokenHandle phThreadToken)
             {
                 var openAsSelf = dwOpenAs != WinSecurityContext.Thread;
@@ -371,7 +383,9 @@ namespace portent
             /// <returns>
             /// If the function succeeds, the return value is nonzero.
             /// </returns>
-            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-setthreadtoken"/>
+            /// <see>
+            /// <cref>https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-setthreadtoken</cref>
+            /// </see>
             [DllImport("advapi32.dll", SetLastError = true)]
             private static extern bool SetThreadToken(IntPtr threadHandle, SafeTokenHandle hToken);
 
@@ -390,13 +404,7 @@ namespace portent
             /// </returns>
             internal static int SetThreadToken(SafeTokenHandle hToken)
             {
-                int hr = 0;
-                if (!SetThreadToken(IntPtr.Zero, hToken))
-                {
-                    hr = Marshal.GetHRForLastWin32Error();
-                }
-
-                return hr;
+                return SetThreadToken(IntPtr.Zero, hToken) ? 0 : Marshal.GetHRForLastWin32Error();
             }
         }
     }
