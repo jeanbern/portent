@@ -4,35 +4,14 @@ namespace portent
 {
     internal sealed class MemoryChunkBuilder
     {
-        private long _count;
-
-        public MemoryChunkBuilder ReserveUnaligned<T>(int count) where T : unmanaged
-        {
-            return ReserveUnaligned(count * Unsafe.SizeOf<T>());
-        }
-
-        public MemoryChunkBuilder ReserveUnaligned<T>(T[] array) where T : unmanaged
-        {
-            return ReserveUnaligned(array.Length * Unsafe.SizeOf<T>());
-        }
-
-        public MemoryChunkBuilder ReserveUnaligned(long length)
-        {
-            _count += length;
-            return this;
-        }
-
-        public MemoryChunkBuilder ReserveAligned<T>(int count) where T : unmanaged
-        {
-            return ReserveAligned(count * Unsafe.SizeOf<T>());
-        }
+        private ulong _count;
 
         public MemoryChunkBuilder ReserveAligned<T>(T[] array) where T : unmanaged
         {
-            return ReserveAligned(array.Length * Unsafe.SizeOf<T>());
+            return ReserveAligned((ulong)(array.Length * Unsafe.SizeOf<T>()));
         }
 
-        public MemoryChunkBuilder ReserveAligned(long length)
+        public MemoryChunkBuilder ReserveAligned(ulong length)
         {
             var necessaryOffset = MemoryAlignmentHelper.RequiredOffset(0, _count, length);
             _count += length + necessaryOffset;

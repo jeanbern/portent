@@ -10,14 +10,7 @@ namespace portent
         private readonly SuggestItemEnumerator _enum = new SuggestItemEnumerator();
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Update(SuggestItem item)
-        {
-            _enum.Current = item;
-            _enum.Ready = true;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Update(string term, long count)
+        public void Update(string term, ulong count)
         {
             _enum.Item = new SuggestItem(term, count);
             _enum.Ready = true;
@@ -43,14 +36,7 @@ namespace portent
             public bool Ready;
             public SuggestItem Item;
 
-            [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public void Update(in SuggestItem item)
-            {
-                Item = item;
-                Ready = false;
-            }
-
-            public SuggestItem Current { get; internal set; }
+            public SuggestItem Current => Item;
 
             object IEnumerator.Current => Current;
 
@@ -61,13 +47,13 @@ namespace portent
 
             public bool MoveNext()
             {
-                if (Ready)
+                if (!Ready)
                 {
-                    Ready = false;
-                    return true;
+                    return false;
                 }
 
-                return false;
+                Ready = false;
+                return true;
             }
 
             public void Reset()

@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
@@ -22,7 +21,7 @@ namespace portent
         /// </summary>
         public readonly Dictionary<char, GraphEdge> ChildEdges = new Dictionary<char, GraphEdge>();
 
-        public void RecursiveAddEdgeCount(long count)
+        public void RecursiveAddEdgeCount(ulong count)
         {
             foreach (var childEdge in ChildEdges.Values)
             {
@@ -57,11 +56,11 @@ namespace portent
             }
 
             Visited = true;
-            foreach (var child in SortedChildren.Reverse())
+            foreach (var (_, node) in SortedChildren.Reverse())
             {
-                if (!child.Value.Visited)
+                if (!node.Visited)
                 {
-                    child.Value.TopologicalSortChildren(results);
+                    node.TopologicalSortChildren(results);
                 }
             }
 
@@ -81,12 +80,12 @@ namespace portent
 
             nodes.Add(this);
 
-            foreach (var child in Children)
+            foreach (var (_, node) in Children)
             {
-                child.Value.Parents.Add(this);
+                node.Parents.Add(this);
                 // ReSharper disable once PossibleNullReferenceException
-                var childEdges = child.Value.GatherNodesCountEdges(nodes);
-                Count += child.Value.Count;
+                var childEdges = node.GatherNodesCountEdges(nodes);
+                Count += node.Count;
                 //Add 1 to represent the edge to the child itself.
                 totalEdges += childEdges + 1;
             }
@@ -119,10 +118,10 @@ namespace portent
                 builder.Append('-');
             }
 
-            foreach (var edge in Children)
+            foreach (var (key, node) in Children)
             {
-                builder.Append(edge.Key);
-                edge.Value.StringMe(builder);
+                builder.Append(key);
+                node.StringMe(builder);
             }
 
             builder.Append(')');
@@ -145,10 +144,10 @@ namespace portent
 
             var hash = IsTerminal ? 1 : 0;
             hash = ((hash << 5) + hash) ^ '(';
-            foreach (var dawgNode in Children)
+            foreach (var (key, node) in Children)
             {
-                hash = ((hash << 5) + hash) ^ dawgNode.Key;
-                hash = ((hash << 5) + hash) ^ dawgNode.Value.PrivateHash();
+                hash = ((hash << 5) + hash) ^ key;
+                hash = ((hash << 5) + hash) ^ node.PrivateHash();
             }
 
             hash = ((hash << 5) + hash) ^ ')';

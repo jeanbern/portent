@@ -17,81 +17,22 @@ namespace portent
     internal sealed class LargePageMemoryChunk : IDisposable
     {
         private readonly IntPtr _ptr;
-        private readonly long _bytesReserved;
+        private readonly ulong _bytesReserved;
 
-        private long _offset;
+        private ulong _offset;
         private bool _locked;
 
         public bool Lock()
         {
             if (!_locked)
             {
-                var reservedAsPointer = new IntPtr(_bytesReserved);
+                var reservedAsPointer = new IntPtr((long) _bytesReserved);
                 var result = NativeMethods.VirtualProtect(_ptr, reservedAsPointer, MemoryProtectionConstants.PageReadonly, out _);
                 result = result && NativeMethods.VirtualLock(_ptr, reservedAsPointer);
                 _locked = result;
             }
 
             return _locked;
-        }
-
-        /// <summary>
-        /// Reserves part of the memory region for an array of the specififed type and length.
-        /// </summary>
-        /// <typeparam name="T">The type of the array elements.</typeparam>
-        /// <param name="length">The count of items in the array.</param>
-        /// <returns>A pointer to the first item in the array.</returns>
-        public unsafe T* GetArray<T>(long length)
-            where T : unmanaged
-        {
-            var lengthInBytes = Unsafe.SizeOf<T>() * length;
-            Debug.Assert(_offset + lengthInBytes <= _bytesReserved);
-
-            var result = (T*)(((byte*)_ptr) + _offset);
-            _offset += lengthInBytes;
-
-            return result;
-        }
-
-        /// <summary>
-        /// Reserves part of the memory region for an array of the specififed type and length.
-        /// The part reserved will be aligned on a <see cref="PageAlignmentBytes"/> byte boundary.
-        /// </summary>
-        /// <typeparam name="T">The type of the array elements.</typeparam>
-        /// <param name="length">The count of items in the array.</param>
-        /// <returns>A pointer to the first item in the array.</returns>
-        public unsafe T* GetArrayAligned<T>(long length)
-            where T : unmanaged
-        {
-            var lengthInBytes = Unsafe.SizeOf<T>() * length;
-            var necessaryOffset = MemoryAlignmentHelper.RequiredOffset((long)_ptr, _offset, length);
-
-            Debug.Assert(_offset + lengthInBytes + necessaryOffset <= _bytesReserved);
-
-            var result = (T*)(((byte*)_ptr) + _offset + necessaryOffset);
-            _offset += lengthInBytes + necessaryOffset;
-
-            return result;
-        }
-
-        /// <summary>
-        /// Reserves part of the memory region and copies into it the elements of a supplied array.
-        /// </summary>
-        /// <typeparam name="T">The type of the array elements.</typeparam>
-        /// <param name="array">The original managed heap array.</param>
-        /// <returns>A pointer to the first item in the new array.</returns>
-        public unsafe T* CopyArray<T>(T[] array)
-            where T : unmanaged
-        {
-            var lengthInBytes = Unsafe.SizeOf<T>() * array.Length;
-            Debug.Assert(_offset + lengthInBytes <= _bytesReserved);
-
-            var result = (T*)(((byte*)_ptr) + _offset);
-            _offset += lengthInBytes;
-
-            Unsafe.CopyBlockUnaligned(result, Unsafe.AsPointer(ref array[0]), (uint)lengthInBytes);
-
-            return result;
         }
 
         /// <summary>
@@ -103,8 +44,8 @@ namespace portent
         public unsafe T* CopyArrayAligned<T>(T[] array)
             where T : unmanaged
         {
-            var lengthInBytes = (long)Unsafe.SizeOf<T>() * array.Length;
-            var necessaryOffset = MemoryAlignmentHelper.RequiredOffset((long)_ptr, _offset, lengthInBytes);
+            var lengthInBytes = (ulong) (Unsafe.SizeOf<T>() * array.Length);
+            var necessaryOffset = MemoryAlignmentHelper.RequiredOffset((ulong)_ptr, _offset, lengthInBytes);
 
             Debug.Assert(_offset + lengthInBytes + necessaryOffset <= _bytesReserved);
 
@@ -116,7 +57,7 @@ namespace portent
             return result;
         }
 
-        public LargePageMemoryChunk(long length)
+        public LargePageMemoryChunk(ulong length)
         {
             const MemoryAllocationType flags = MemoryAllocationType.MemReserve | MemoryAllocationType.MemCommit;
             const string lockMemory = "SeLockMemoryPrivilege";
@@ -159,7 +100,7 @@ namespace portent
             {
                 if (_locked)
                 {
-                    var reservedAsPointer = new IntPtr(_bytesReserved);
+                    var reservedAsPointer = new IntPtr((long) _bytesReserved);
                     NativeMethods.VirtualProtect(_ptr, reservedAsPointer, MemoryProtectionConstants.PageReadwrite, out _);
                     NativeMethods.VirtualUnlock(_ptr, reservedAsPointer);
                 }

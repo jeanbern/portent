@@ -40,12 +40,23 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="DawgFromHome.cs" />
+    <Compile Remove="SafeOldDawg.cs" />
+    <Compile Remove="SaferDawg.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Fody" Version="6.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="JetBrains.Annotations" Version="2019.1.3" />
     <PackageReference Include="LocalsInit.Fody" Version="1.1.0" />
     <PackageReference Include="System.Runtime" Version="4.3.1" />
     <PackageReference Include="System.Runtime.CompilerServices.Unsafe" Version="4.6.0-preview9.19421.4" />
   </ItemGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="&quot;C:\Program Files\PowerShell\6\pwsh.exe&quot; -ExecutionPolicy ByPass C:\doctemp\signingScript.ps1 -filepath &quot;$(TargetPath)&quot;" />
+  </Target>
 </Project>

@@ -84,7 +84,7 @@ namespace portent.Benchmark
                         continue;
                     }
 
-                    if (!long.TryParse(lineTokens[1], out var count))
+                    if (!ulong.TryParse(lineTokens[1], out var count))
                     {
                         continue;
                     }
@@ -99,7 +99,7 @@ namespace portent.Benchmark
         }
 
         [Params(0, 1, 2, 3)]
-        public int MaxErrors { get; set; }
+        public uint MaxErrors { get; set; }
 
         [GlobalSetup]
         [SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "Used via reflection by DotNetBenchmark")]

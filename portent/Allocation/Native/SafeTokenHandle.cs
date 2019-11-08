@@ -26,6 +26,7 @@ SOFTWARE.
 
 using System;
 using System.Runtime.InteropServices;
+using JetBrains.Annotations;
 
 namespace portent
 {
@@ -37,6 +38,9 @@ namespace portent
     /// </see>
     internal sealed class SafeTokenHandle : SafeHandle
     {
+        [UsedImplicitly]
+        private SafeTokenHandle() : base(IntPtr.Zero, true) { }
+
         // 0 is an Invalid Handle
         internal SafeTokenHandle(IntPtr handle) : base(IntPtr.Zero, true)
         {

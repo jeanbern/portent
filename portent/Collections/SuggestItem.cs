@@ -5,9 +5,9 @@ namespace portent
     public readonly struct SuggestItem : IEquatable<SuggestItem>
     {
         public readonly string Term;
-        public readonly long Count;
+        public readonly ulong Count;
 
-        public SuggestItem(string term, long count)
+        public SuggestItem(string term, ulong count)
         {
             Term = term;
             Count = count;

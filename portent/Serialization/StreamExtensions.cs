@@ -70,7 +70,7 @@ namespace JBP
             return length;
         }
 
-        private static int GetCompressedSize(long value)
+        private static int GetCompressedSize(ulong value)
         {
             var length = 1;
             while (value >= 0x80)
@@ -170,7 +170,7 @@ namespace JBP
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteCompressed(this Stream stream, Span<long> values)
+        public static void WriteCompressed(this Stream stream, Span<ulong> values)
         {
             stream.WriteCompressed(values.Length);
 
@@ -223,7 +223,7 @@ namespace JBP
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static void WriteCompressed(this Stream stream, long value)
+        public static void WriteCompressed(this Stream stream, ulong value)
         {
             while (value >= 0x80)
             {
@@ -304,11 +304,11 @@ namespace JBP
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static long ReadCompressedLong(this Stream stream)
+        public static ulong ReadCompressedLong(this Stream stream)
         {
             var shift = 0;
             byte b;
-            long value = 0;
+            ulong value = 0;
             const int maxRequiredBytes = 7 * ((sizeof(long) * 8 / 7) + ((sizeof(long) * 8) % 7 == 0 ? 0 : 1));
             do
             {
@@ -319,7 +319,7 @@ namespace JBP
                     return value;
                 }
 
-                value |= (long)(b & 0x7F) << shift;
+                value |= (ulong)(b & 0x7F) << shift;
                 shift += 7;
             } while ((b & 0x80) != 0);
 
@@ -396,7 +396,7 @@ namespace JBP
             return values;
         }
 
-        public static uint[] ReadCompressedUintArray(this Stream stream)
+        public static uint[] ReadCompressedUIntArray(this Stream stream)
         {
             var count = stream.ReadCompressedInt();
             if (count == 0)
@@ -432,15 +432,15 @@ namespace JBP
         }
 
         //TODO: this method sucks
-        public static long[] ReadCompressedLongArray(this Stream stream)
+        public static ulong[] ReadCompressedULongArray(this Stream stream)
         {
             var count = stream.ReadCompressedInt();
             if (count == 0)
             {
-                return Array.Empty<long>();
+                return Array.Empty<ulong>();
             }
 
-            var values = AllocateUninitializedArray<long>(count);
+            var values = AllocateUninitializedArray<ulong>(count);
 
             var index = 0;
             while (index < count)

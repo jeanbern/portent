@@ -7,7 +7,7 @@ namespace portent
 {
     internal static class MemoryAlignmentHelper
     {
-        public static long RequiredOffset(long start, long currentOffset, long requestedLength)
+        public static ulong RequiredOffset(ulong start, ulong currentOffset, ulong requestedLength)
         {
             var currentLocation = start + currentOffset;
             var distanceFromPreviousBoundary = currentLocation % PageAlignmentBytes;
@@ -33,20 +33,26 @@ namespace portent
             return minimumBoundaryOffset;
         }
 
-        public static long LargePageMultiple(long length)
+        public static ulong LargePageMultiple(ulong length)
         {
-            var reserved = (long)LargePageMinimum * (Ceiling(length, (long)LargePageMinimum)+1);
+            var reserved = (ulong) LargePageMinimum * (Ceiling(length, (ulong) LargePageMinimum) + 1);
             Debug.Assert(reserved >= length);
             return reserved;
         }
 
         /// <summary>
-        /// Don't trust this for values <= 0
+        /// Don't trust this for values smaller than or equal to 0
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static long Ceiling(long dividend, long divisor)
+        private static ulong Ceiling(ulong dividend, ulong divisor)
         {
-            return ((dividend - 1) / divisor) + 1;
+            // ReSharper disable once ArrangeRedundantParentheses
+            return 1 + ((dividend - 1) / divisor);
+        }
+
+        public static int GetCacheAlignedSize(long length)
+        {
+            return (int)length + (L1CacheLineSizeBytes - 1);
         }
 
         /// <summary>
@@ -58,10 +64,10 @@ namespace portent
         /// The size in bytes of the required memory allocation.
         /// </returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static int GetCacheAlignedSize<T>(int length)
+        public static int GetCacheAlignedSize<T>(uint length)
             where T : unmanaged
         {
-            return (Unsafe.SizeOf<T>()*length) + (L1CacheLineSizeBytes - 1);
+            return GetCacheAlignedSize(Unsafe.SizeOf<T>() * length);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -85,7 +91,7 @@ namespace portent
 
         private static UIntPtr _largePageMinimumBacking = UIntPtr.Zero;
 
-        public static long PageAlignmentBytes => L1CacheLineSizeBytes;
+        public static ulong PageAlignmentBytes => L1CacheLineSizeBytes;
 
         public static UIntPtr LargePageMinimum
         {
@@ -112,7 +118,9 @@ namespace portent
             /// <remarks>
             /// The minimum large page size varies, but it is typically 2 MB or greater.
             /// </remarks>
-            /// <see cref="https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-getlargepageminimum"/>
+            /// <see>
+            /// <cref>https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-getlargepageminimum</cref>
+            /// </see>
             [DllImport("kernel32.dll", SetLastError = true)]
             internal static extern UIntPtr GetLargePageMinimum();
         }

@@ -20,15 +20,11 @@ namespace portent.Benchmark
             }
 
             // 497, 34814, 869864, 8775261
-            for (var i = 0; i < 4; i++)
+            for (var i = 0u; i < 4; i++)
             {
                 benchmark.MaxErrors = i;
                 Console.WriteLine(benchmark.GetTotalResults());
 
-                for (var j = 0; j < 400; j++)
-                {
-                    benchmark.Benchmark();
-                }
             }
 
             Console.WriteLine("No errors, press {ENTER} to continue...");

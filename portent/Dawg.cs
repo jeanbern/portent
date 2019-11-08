@@ -17,7 +17,7 @@ namespace portent
     {
         [LocalsInit(false)]
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-        public IEnumerable<SuggestItem> Lookup(in string word, int maxEdits)
+        public IEnumerable<SuggestItem> Lookup(in string word, uint maxEdits)
         {
             if (maxEdits == 0)
             {
@@ -33,7 +33,7 @@ namespace portent
                 }
             }
 
-            var wordLength = word.Length;
+            var wordLength = (uint) word.Length;
 
             // TODO: Why does it have wordLength + 1?
             // I think that's for allowing transposition checks to happen at the end.
@@ -58,14 +58,14 @@ namespace portent
             _compoundResultCollection.Clear();
 
             var maxDepth = wordLength + maxEdits;
-            var toCacheLength = MemoryAlignmentHelper.GetCacheAlignedSize<int>(maxDepth);
+            var toCacheLength = MemoryAlignmentHelper.GetCacheAlignedSize<uint>(maxDepth);
             var toCacheBytes = stackalloc byte[toCacheLength];
-            var toCache = MemoryAlignmentHelper.GetCacheAlignedStart<int>(toCacheBytes);
+            var toCache = MemoryAlignmentHelper.GetCacheAlignedStart<uint>(toCacheBytes);
 
             var minTo = Math.Min(wordLength, (2 * maxEdits) + 1);
-            for (var depth = 0; depth < maxDepth; ++depth)
+            for (var depth = 0u; depth < maxDepth; ++depth)
             {
-                toCache[depth] = Math.Min(Math.Min(depth + 1, wordLength - depth) + maxEdits, minTo);
+                toCache[depth] = Math.Min(Math.Min(depth + maxEdits + 1, wordLength + maxEdits - depth), minTo);
             }
 
             var tasks = _tasks;
@@ -113,7 +113,7 @@ namespace portent
         /// <param name="wordLength">The length of the word. The input must be 1 element longer than this value.</param>
         [LocalsInit(false)]
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-        private void Search1Edit(char* word, int wordLength)
+        private void Search1Edit(char* word, uint wordLength)
         {
             var builderByteCount = MemoryAlignmentHelper.GetCacheAlignedSize<char>(wordLength + 1);
             var builderBytes = stackalloc byte[builderByteCount];
@@ -130,14 +130,14 @@ namespace portent
             // Things I tried that don't make a difference:
             // 1. Making this method static and using a readonly ref struct for the const_ variables
             //    "static int GetIndex(in Holder consts, int length)"
-            int GetIndex(int length)
+            int GetIndex(uint length)
             {
                 // Because we want 0-indexed
                 var number = -1;
 
                 var currentNode = const_root;
                 ref var word = ref Unsafe.AsRef<char>(builderStart);
-                ref var end = ref Unsafe.Add(ref Unsafe.AsRef<char>(builderStart), length);
+                ref var end = ref Unsafe.Add(ref Unsafe.AsRef<char>(builderStart), (int) length);
                 do
                 {
                     var target = word;
@@ -210,11 +210,11 @@ namespace portent
                 // ReSharper disable once InvertIf
                 if (currentNode < 0)
                 {
-                    var inputRemaining = (int)(const_wordEnd - input);
+                    var inputRemaining = (uint)(const_wordEnd - input);
                     Unsafe.CopyBlock(builderIndex + 1, input, (uint)(inputRemaining * sizeof(char)));
 
-                    var resultLength = (int)(builderIndex + 1 - builderStart) + inputRemaining;
-                    const_results.Add(new SuggestItem(new string(builderStart, 0, resultLength), const_wordCount[GetIndex(resultLength)]));
+                    var resultLength = (uint)(builderIndex + 1 - builderStart) + inputRemaining;
+                    const_results.Add(new string(builderStart, 0, (int) resultLength), const_wordCount[GetIndex(resultLength)]);
                 }
             }
 
@@ -293,7 +293,7 @@ namespace portent
                                         *builderIndex = secondEdgeChar;
                                         //deletion + match + match + end
                                         var wordIndex = GetIndex(wordLength - 1);
-                                        const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength - 1), const_wordCount[wordIndex]));
+                                        const_results.Add(new string(builderStart, 0, (int) wordLength - 1), const_wordCount[wordIndex]);
                                     }
                                 }
                                 else
@@ -357,7 +357,7 @@ namespace portent
                     if (edgeNode < 0)
                     {
                         //deletion + match:
-                        const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength - 1), const_wordCount[GetIndex(wordLength - 1)]));
+                        const_results.Add(new string(builderStart, 0, (int) wordLength - 1), const_wordCount[GetIndex(wordLength - 1)]);
                     }
 
                     builderIndex++;
@@ -372,7 +372,7 @@ namespace portent
                                 currentNode = -currentNode;
                                 //transposition:
                                 *builderIndex = secondEdgeChar;
-                                const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength), const_wordCount[GetIndex(wordLength)]));
+                                const_results.Add(new string(builderStart, 0, (int) wordLength), const_wordCount[GetIndex(wordLength)]);
                             }
 
                             var m = const_firstChildEdgeIndex[currentNode];
@@ -385,7 +385,7 @@ namespace portent
                                     *builderIndex = secondEdgeChar;
                                     *(builderIndex + 1) = thirdEdgeChar;
                                     //insertion + match
-                                    const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength + 1), const_wordCount[GetIndex(wordLength + 1)]));
+                                    const_results.Add(new string(builderStart, 0, (int) wordLength + 1), const_wordCount[GetIndex(wordLength + 1)]);
                                     break;
                                 }
                             }
@@ -394,7 +394,7 @@ namespace portent
                         {
                             //substitution + match:
                             *builderIndex = secondEdgeChar;
-                            const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength), const_wordCount[GetIndex(wordLength)]));
+                            const_results.Add(new string(builderStart, 0, (int) wordLength), const_wordCount[GetIndex(wordLength)]);
                         }
                     }
 
@@ -416,7 +416,7 @@ namespace portent
             {
                 nextNode = -nextNode;
                 //delete + end
-                const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength - 1), const_wordCount[GetIndex(wordLength - 1)]));
+                const_results.Add(new string(builderStart, 0, (int) wordLength - 1), const_wordCount[GetIndex(wordLength - 1)]);
             }
 
             // Now searching for the last character.
@@ -433,7 +433,7 @@ namespace portent
                     // substitution and word ended
                     // OR match at end of word
                     // Don't have to check, both are within 1 error.
-                    const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength), const_wordCount[GetIndex(wordLength)]));
+                    const_results.Add(new string(builderStart, 0, (int) wordLength), const_wordCount[GetIndex(wordLength)]);
                     edgeNode = -edgeNode;
                 }
 
@@ -448,7 +448,7 @@ namespace portent
                         {
                             // insertions + match at end of word.
                             *(builderIndex + 1) = target;
-                            const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength + 1), const_wordCount[GetIndex(wordLength + 1)]));
+                            const_results.Add(new string(builderStart, 0, (int) wordLength + 1), const_wordCount[GetIndex(wordLength + 1)]);
                         }
                     }
                 }
@@ -460,7 +460,7 @@ namespace portent
                         {
                             //match + insertions at end of word.
                             *(builderIndex + 1) = const_edgeCharacter[j];
-                            const_results.Add(new SuggestItem(new string(builderStart, 0, wordLength + 1), const_wordCount[GetIndex(wordLength + 1)]));
+                            const_results.Add(new string(builderStart, 0, (int) wordLength + 1), const_wordCount[GetIndex(wordLength + 1)]);
                         }
                     }
                 }
@@ -469,8 +469,8 @@ namespace portent
 
         [LocalsInit(false)]
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-        private void Search2Edits(int edge, // Not captured
-            char* word, int wordLength, int* toCache)
+        private void Search2Edits(uint edge, // Not captured
+            char* word, uint wordLength, uint* toCache)
         {
             // The real stripeWidth is usually 2*max + 1 = 5
             // Normally we would do a bound check and calculate a value for the cell in previousRow directly after our stripe.
@@ -499,7 +499,7 @@ namespace portent
             var editMatrix = MemoryAlignmentHelper.GetCacheAlignedStart<int>(editMatrixAlloc);
 
             // This variable, in addition to the 2 later, are used for parameter passing in MatchCharacterX
-            var builderDepth = 4;
+            var builderDepth = 4u;
 
             // These two variables are used for parameter passing between MatchCharacter1-3
             var currentCharacter = builder[0] = edgeCharacters[edge];
@@ -521,7 +521,7 @@ namespace portent
                 // previousRowOffset == 1 once we have started shifting.
                 // Our stripe ignores early characters once we've gone deep enough.
                 var previousRowPreviousColumn = previousRow[skip];
-                var wordWithOffset = word + builderDepth - 2;
+                var wordWithOffset = word + (int)builderDepth - 2;
                 var previousWordCharacter = wordWithOffset[skip];
 
                 var any = 0;
@@ -536,7 +536,7 @@ namespace portent
                         // Non-match.
                         // Expected case.
                         var result2 = Math.Min(result1, previousRowPreviousColumn) + 1;
-                        if ((currentCharacter != previousWordCharacter) || (builder[builderDepth - 1] != wordCharacter))
+                        if ((currentCharacter != previousWordCharacter) || (builder[(int)builderDepth - 1] != wordCharacter))
                         {
                             // Non-transposition.
                             // Expected case.
@@ -568,7 +568,7 @@ namespace portent
 
                 if (node < 0 && currentRowPreviousColumn <= 2 && wordLength <= builderDepth + 3)
                 {
-                    results.Add(new SuggestItem(new string(builder, 0, builderDepth + 1), wordCount[GetIndex(ref Unsafe.AsRef<char>(builder), builderDepth + 1)]));
+                    results.Add(new string(builder, 0, (int) builderDepth + 1), wordCount[GetIndex(ref Unsafe.AsRef<char>(builder), builderDepth + 1)]);
                 }
 
                 if (wordLength < builderDepth)
@@ -668,7 +668,7 @@ namespace portent
 
                 if (node < 0 && currentRowPreviousColumn <= 2 && wordLength <= 6)
                 {
-                    results.Add(new SuggestItem(new string(builder, 0, 4), wordCount[GetIndex(ref Unsafe.AsRef<char>(builder), 4)]));
+                    results.Add(new string(builder, 0, 4), wordCount[GetIndex(ref Unsafe.AsRef<char>(builder), 4)]);
                 }
 
                 if (wordLength < 3)
@@ -755,7 +755,7 @@ namespace portent
 
                 if (node < 0 && currentRowPreviousColumn <= 2 && wordLength <= 5)
                 {
-                    results.Add(new SuggestItem(new string(builder, 0, 3), wordCount[GetIndex(ref Unsafe.AsRef<char>(builder), 3)]));
+                    results.Add(new string(builder, 0, 3), wordCount[GetIndex(ref Unsafe.AsRef<char>(builder), 3)]);
                 }
 
                 if (wordLength < 2)
@@ -838,7 +838,7 @@ namespace portent
                 row1[to1] = currentRowPreviousColumn + 1;
                 if (node < 0 && currentRowPreviousColumn <= 2 && wordLength <= 4)
                 {
-                    results.Add(new SuggestItem(new string(builder, 0, 2), wordCount[GetIndex(ref Unsafe.AsRef<char>(builder), 2)]));
+                    results.Add(new string(builder, 0, 2), wordCount[GetIndex(ref Unsafe.AsRef<char>(builder), 2)]);
                 }
 
                 var temp = Abs(node);
@@ -878,7 +878,7 @@ namespace portent
 
             if (node < 0 && (wordLength < 3 || (wordLength == 3 && row0[2] == 2)))
             {
-                results.Add(new SuggestItem(new string(builder, 0, 1), wordCount[GetIndex(ref Unsafe.AsRef<char>(builder), 1)]));
+                results.Add(new string(builder, 0, 1), wordCount[GetIndex(ref Unsafe.AsRef<char>(builder), 1)]);
             }
 
             var temp = Abs(node);
@@ -895,12 +895,12 @@ namespace portent
         private readonly struct Invariants
         {
             public readonly Dawg _dawg;
-            public readonly long* _wordCounts;
-            public readonly int* _firstChildEdgeIndex;
+            public readonly ulong* _wordCounts;
+            public readonly uint* _firstChildEdgeIndex;
             public readonly int* _edgeToNodeIndex;
             public readonly char* _edgeCharacters;
 
-            public Invariants(long* wordCounts, int* firstChildEdgeIndex, char* edgeCharacters, Dawg dawg, int* edgeToNodeIndex)
+            public Invariants(ulong* wordCounts, uint* firstChildEdgeIndex, char* edgeCharacters, Dawg dawg, int* edgeToNodeIndex)
             {
                 _wordCounts = wordCounts;
                 _firstChildEdgeIndex = firstChildEdgeIndex;
@@ -914,18 +914,18 @@ namespace portent
         {
             public readonly Invariants _invariants;
             public readonly SuggestItemCollection _results;
-            public readonly int* _const_row0;
-            public readonly int _const_stripeWidth;
-            public readonly int* _toCache;
-            public readonly int _wordLength;
-            public readonly int _maxPlusOne;
+            public readonly uint* _const_row0;
+            public readonly uint _const_stripeWidth;
+            public readonly uint* _toCache;
+            public readonly uint _wordLength;
+            public readonly uint _maxPlusOne;
             public readonly char* _const_builder;
             public readonly char* _first;
-            public int _builderDepth;
+            public uint _builderDepth;
             public int _node;
             public char _edgeCharacter;
 
-            public Variants(Invariants invariants, SuggestItemCollection results, int* const_row0, int const_stripeWidth, char* first, int* toCache, char* const_builder, int wordLength, int maxPlusOne, char edgeCharacter, int node)
+            public Variants(Invariants invariants, SuggestItemCollection results, uint* const_row0, uint const_stripeWidth, char* first, uint* toCache, char* const_builder, uint wordLength, uint maxPlusOne, char edgeCharacter, int node)
             {
                 _invariants = invariants;
                 _results = results;
@@ -936,7 +936,7 @@ namespace portent
                 _const_builder = const_builder;
                 _wordLength = wordLength;
                 _maxPlusOne = maxPlusOne;
-                _builderDepth = 0;
+                _builderDepth = 0u;
                 _edgeCharacter = edgeCharacter;
                 _node = node;
             }
@@ -944,8 +944,8 @@ namespace portent
 
         [LocalsInit(false)]
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-        private void SearchWithEdits(int edge, // Not captured
-            int maxPlusOne, char* first, int wordLength, int* toCache)
+        private void SearchWithEdits(uint edge, // Not captured
+            uint maxPlusOne, char* first, uint wordLength, uint* toCache)
         {
             ref var invariants = ref Unsafe.AsRef(_invariants);
             // The real stripeWidth is 2*max + 1
@@ -954,11 +954,11 @@ namespace portent
             // For this reason, the stripeWidth gets an additional + 1, making it 2 * max + 2
             var const_stripeWidth = 2 * maxPlusOne;
 
-            var matrixLength = MemoryAlignmentHelper.GetCacheAlignedSize<int>((wordLength + maxPlusOne) * const_stripeWidth);
+            var matrixLength = MemoryAlignmentHelper.GetCacheAlignedSize<uint>((wordLength + maxPlusOne) * const_stripeWidth);
             var editMatrixAlloc = stackalloc byte[matrixLength];
-            var const_row0 = MemoryAlignmentHelper.GetCacheAlignedStart<int>(editMatrixAlloc);
+            var const_row0 = MemoryAlignmentHelper.GetCacheAlignedStart<uint>(editMatrixAlloc);
 
-            for (var x = 0; x < maxPlusOne; ++x)
+            for (var x = 0u; x < maxPlusOne; ++x)
             {
                 const_row0[x] = x + 1;
             }
@@ -974,7 +974,7 @@ namespace portent
             var results = _compoundResultCollection.Bags[edge - _rootFirstChild];
             var variants = new Variants(invariants, results, const_row0, const_stripeWidth, first, toCache, const_builder, wordLength, maxPlusOne, edgeCharacter, node);
 
-            static void MatchCharacter(ref Variants variants, int skip)
+            static void MatchCharacter(ref Variants variants, uint skip)
             {
                 // This is the value for the column directly before our diagonal stripe.
                 // It's the one we avoided setting in previousRow earlier.
@@ -984,14 +984,14 @@ namespace portent
                 var currentRow = previousRow + variants._const_stripeWidth;
 
                 char previousWordCharacter;
-                int previousRowPreviousColumn;
+                uint previousRowPreviousColumn;
                 char* firstWithOffset;
 
                 // Normally the strip would travel diagonally through the matrix. We shift it left to keep it starting at 0.
                 // previousRowOffset == 1 once we have started shifting.
                 int previousRowOffset;
                 // Our stripe ignores early characters once we've gone deep enough.
-                var wordArrayOffset = variants._builderDepth - variants._maxPlusOne;
+                var wordArrayOffset = (int)variants._builderDepth - (int)variants._maxPlusOne;
 
                 if (wordArrayOffset < 0)
                 {
@@ -1011,7 +1011,7 @@ namespace portent
 
                 var any = 0;
                 var to = variants._toCache[variants._builderDepth];
-                for (var j = skip; j < to; ++j)
+                for (var j = (int)skip; j < to; ++j)
                 {
                     var previousRowCurrentColumn = previousRow[j + previousRowOffset];
                     var wordCharacter = firstWithOffset[j];
@@ -1019,7 +1019,7 @@ namespace portent
                     if (variants._edgeCharacter != wordCharacter)
                     {
                         var result2 = Math.Min(result1, previousRowPreviousColumn) + 1;
-                        if ((variants._edgeCharacter != previousWordCharacter) || (variants._builderDepth == 0) || (variants._const_builder[variants._builderDepth - 1] != wordCharacter))
+                        if ((variants._edgeCharacter != previousWordCharacter) || (variants._builderDepth == 0) || (variants._const_builder[(int)variants._builderDepth - 1] != wordCharacter))
                         {
                             // Non-match.
                             // Expected case.
@@ -1034,7 +1034,7 @@ namespace portent
                                 // There is no (previousRow - rowWidth). It would be row 0 in the Levenshtein matrix, the one with no letters.
                                 // In this case, the cell value is simply it's column # j
                                 // Use that instead of (previousRow - stripeWidth)[j - 2]
-                                currentRowPreviousColumn = Math.Min(result2, j);
+                                currentRowPreviousColumn = Math.Min(result2, (uint)j);
                             }
                             else if (variants._builderDepth < variants._maxPlusOne)
                             {
@@ -1070,7 +1070,7 @@ namespace portent
                     previousWordCharacter = wordCharacter;
                     currentRow[j] = currentRowPreviousColumn;
                     // Will make `any` negative if currentRowPreviousColumn > maxErrors
-                    any |= currentRowPreviousColumn - variants._maxPlusOne;
+                    any |= (int)currentRowPreviousColumn - (int)variants._maxPlusOne;
                 }
 
                 if (any >= 0)
@@ -1082,7 +1082,7 @@ namespace portent
 
                 if (variants._node < 0 && currentRowPreviousColumn < variants._maxPlusOne && variants._builderDepth + variants._maxPlusOne >= variants._wordLength)
                 {
-                    variants._results.Add(new SuggestItem(new string(variants._const_builder, 0, variants._builderDepth + 1), variants._invariants._wordCounts[variants._invariants._dawg.GetIndex(ref Unsafe.AsRef<char>(variants._const_builder), variants._builderDepth + 1)]));
+                    variants._results.Add(new string(variants._const_builder, 0, (int) variants._builderDepth + 1), variants._invariants._wordCounts[variants._invariants._dawg.GetIndex(ref Unsafe.AsRef<char>(variants._const_builder), variants._builderDepth + 1)]);
                 }
 
                 if (variants._builderDepth + 2 >= variants._wordLength + variants._maxPlusOne)
@@ -1108,7 +1108,7 @@ namespace portent
                         ++counterSpot;
                     }
 
-                    skip = (int)(counterSpot - currentRow);
+                    skip = (uint)(counterSpot - currentRow);
                 }
 
                 if (skip >= variants._toCache[variants._builderDepth + 1])
@@ -1257,7 +1257,7 @@ namespace portent
         // This one has fewer checks because it's private and we only call it with a real word
         [Pure]
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
-        private int GetIndex(ref char word, int length)
+        private int GetIndex(ref char word, uint length)
         {
             // Because we want 0-indexed
             var number = -1;
@@ -1268,7 +1268,7 @@ namespace portent
             ref var edgeNodeIndex = ref Unsafe.AsRef<int>(_edgeToNodeIndex);
             ref var characters = ref Unsafe.AsRef<char>(_edgeCharacter);
             ref var terminals = ref Unsafe.AsRef<ushort>(_reachableTerminalNodes);
-            ref var end = ref Unsafe.Add(ref pointy, length);
+            ref var end = ref Unsafe.Add(ref pointy, (int) length);
             do
             {
                 var target = pointy;
@@ -1310,15 +1310,15 @@ namespace portent
         public int Count { get; }
 
         private readonly int _rootNodeIndex;
-        private readonly int _rootFirstChild;
-        private readonly int _rootLastChild;
+        private readonly uint _rootFirstChild;
+        private readonly uint _rootLastChild;
 
-        private readonly int* _firstChildEdgeIndex;
+        private readonly uint* _firstChildEdgeIndex;
         private readonly int* _edgeToNodeIndex;
         private readonly char* _edgeCharacter;
         private readonly ushort* _reachableTerminalNodes;
 
-        private readonly long* _wordCounts;
+        private readonly ulong* _wordCounts;
 
         private readonly Task[] _tasks;
         private readonly LargePageMemoryChunk _memoryBlock;
@@ -1380,7 +1380,6 @@ namespace portent
         {
             _memoryBlock.Dispose();
             _singleWordResult.Dispose();
-            _resultCollection.Dispose();
             _compoundResultCollection.Dispose();
         }
     }

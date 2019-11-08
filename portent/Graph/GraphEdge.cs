@@ -3,7 +3,7 @@
     internal sealed class GraphEdge
     {
         public char Label;
-        public long Count;
+        public ulong Count;
         public GraphNode Target;
 
         public GraphEdge(GraphNode target)

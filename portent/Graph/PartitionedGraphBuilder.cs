@@ -8,7 +8,6 @@ namespace portent
 {
     public sealed class PartitionedGraphBuilder
     {
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Critical Code Smell", "S1215:\"GC.Collect\" should not be called", Justification = "This method allocates multiple large arrays in the Large Object Heap")]
         public CompressedSparseRowGraph AsCompressedSparseRows()
         {
             var root = Finish();
@@ -21,12 +20,12 @@ namespace portent
 
             var edgeToNodeIndex = new int[edges];
             var edgeCharacter = new char[edges];
-            var firstChildEdgeIndex = new int[allNodes.Count + 1];
-            firstChildEdgeIndex[^1] = edgeToNodeIndex.Length;
+            var firstChildEdgeIndex = new uint[allNodes.Count + 1];
+            firstChildEdgeIndex[^1] = (uint)edgeToNodeIndex.Length;
             var rootNodeIndex = root.OrderedId;
             var reachableTerminalNodes = new ushort[allNodes.Count];
 
-            var edgeIndex = 0;
+            var edgeIndex = 0u;
             var nodeCount = 0;
             foreach (var node in allNodes)
             {
@@ -36,21 +35,21 @@ namespace portent
                 firstChildEdgeIndex[nodeId] = edgeIndex;
                 reachableTerminalNodes[nodeId] = (ushort)node.ReachableTerminalNodes;
 
-                foreach (var child in node.SortedChildren)
+                foreach (var (key, childNode) in node.SortedChildren)
                 {
-                    var terminalModifier = child.Value.IsTerminal ? -1 : 1;
-                    edgeToNodeIndex[edgeIndex] = terminalModifier * child.Value.OrderedId;
-                    edgeCharacter[edgeIndex] = child.Key;
+                    var terminalModifier = childNode.IsTerminal ? -1 : 1;
+                    edgeToNodeIndex[edgeIndex] = terminalModifier * childNode.OrderedId;
+                    edgeCharacter[edgeIndex] = key;
                     ++edgeIndex;
                 }
             }
 
-            var wordCounts = new long[WordCount];
+            var wordCounts = new ulong[WordCount];
 
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
             GC.Collect();
 
-            return new CompressedSparseRowGraph(rootNodeIndex, firstChildEdgeIndex, edgeToNodeIndex, edgeCharacter, reachableTerminalNodes, wordCounts, Counts);
+            return new CompressedSparseRowGraph(rootNodeIndex, firstChildEdgeIndex, edgeToNodeIndex, edgeCharacter, reachableTerminalNodes, wordCounts, _counts);
         }
 
         private const int MaxWordLength = 40;
@@ -68,13 +67,13 @@ namespace portent
 
         private int _stackTop = -1;
 
-        private readonly Dictionary<string, long> Counts = new Dictionary<string, long>();
-        internal int WordCount => Counts.Count;
+        private readonly Dictionary<string, ulong> _counts = new Dictionary<string, ulong>();
+        internal int WordCount => _counts.Count;
 
         /// <summary>
         /// Inserts a word into the DAWG. Words are expected to be provided in a sorted order.
         /// </summary>
-        public void Insert(string word, long count)
+        public void Insert(string word, ulong count)
         {
             if (WordCount % 5000 == 0)
             {
@@ -112,7 +111,7 @@ namespace portent
             // Trying to smooth it because we go down weird branches to look for edits.
             node.Count = (long)Math.Log2(count);
             _previousWord = word;
-            Counts.Add(word, count);
+            _counts.Add(word, count);
         }
 
         internal GraphNode Finish()
@@ -218,7 +217,7 @@ namespace portent
             var added = 0;
             var total = AllNodes.Count;
             OrderedNodes.Capacity = total;
-            var decider = new Dictionary<GraphNode, long>();
+            var decider = new Dictionary<GraphNode, ulong>();
 
             Debug.WriteLine($"\t{stopwatch.ElapsedMilliseconds.ToString()} Starting Loop");
             stopwatch.Restart();
@@ -244,7 +243,7 @@ namespace portent
                             continue;
                         }
 
-                        if (decider.TryGetValue(childEdge.Target, out long result))
+                        if (decider.TryGetValue(childEdge.Target, out _))
                         {
                             decider[childEdge.Target] += childEdge.Count;
                         }
@@ -268,7 +267,7 @@ namespace portent
                                 continue;
                             }
 
-                            if (decider.TryGetValue(childEdge.Target, out long result))
+                            if (decider.TryGetValue(childEdge.Target, out _))
                             {
                                 decider[childEdge.Target] += childEdge.Count;
                             }
@@ -282,28 +281,29 @@ namespace portent
 
                 innerStopwatch.Stop();
 
-                var node = potentials.First();
+                var maxNode = potentials.First();
 
-                var max = -1L;
-                foreach (var item in decider)
+                var max = 0UL;
+                foreach (var (key, node) in decider)
                 {
-                    if (item.Value > max)
+                    // ReSharper disable once InvertIf - Clarity
+                    if (node > max)
                     {
-                        max = item.Value;
-                        node = item.Key;
+                        max = node;
+                        maxNode = key;
                     }
                 }
 
-                Add(node, parentCounts);
+                Add(maxNode, parentCounts);
 
                 if (window.Count >= windowSize)
                 {
                     window.Dequeue();
                 }
 
-                window.Enqueue(node);
+                window.Enqueue(maxNode);
 
-                potentials.Remove(node);
+                potentials.Remove(maxNode);
             }
 
             Debug.WriteLine($"\tTopological Sort complete. Inner loop took {innerStopwatch.ElapsedMilliseconds.ToString()} out of {stopwatch.ElapsedMilliseconds.ToString()} for the outer loop.");
@@ -311,7 +311,7 @@ namespace portent
 
         private void CollectNodes()
         {
-            AllNodes.Capacity = Counts.Count;
+            AllNodes.Capacity = _counts.Count;
             EdgeCount = _root.GatherNodesCountEdges(AllNodes);
         }
 

@@ -8,13 +8,13 @@ namespace portent
 {
     public sealed class CompressedSparseRowGraph
     {
-        internal CompressedSparseRowGraph(int rootNodeIndex, int[] firstChildEdgeIndex, int[] edgeToNodeIndex, char[] edgeCharacter, ushort[] reachableTerminalNodes, long[] data, Dictionary<string, long> wordCounts)
+        internal CompressedSparseRowGraph(int rootNodeIndex, uint[] firstChildEdgeIndex, int[] edgeToNodeIndex, char[] edgeCharacter, ushort[] reachableTerminalNodes, ulong[] data, Dictionary<string, ulong> wordCounts)
             : this(rootNodeIndex, firstChildEdgeIndex, edgeToNodeIndex, edgeCharacter, reachableTerminalNodes, data)
         {
             AssignCounts(RootNodeIndex, new char[100], 0, -1, wordCounts);
         }
 
-        private CompressedSparseRowGraph(int rootNodeIndex, int[] firstChildEdgeIndex, int[] edgeToNodeIndex, char[] edgeCharacter, ushort[] reachableTerminalNodes, long[] data)
+        private CompressedSparseRowGraph(int rootNodeIndex, uint[] firstChildEdgeIndex, int[] edgeToNodeIndex, char[] edgeCharacter, ushort[] reachableTerminalNodes, ulong[] data)
         {
             RootNodeIndex = rootNodeIndex;
             FirstChildEdgeIndex = firstChildEdgeIndex;
@@ -25,13 +25,13 @@ namespace portent
         }
 
         internal readonly int RootNodeIndex;
-        internal readonly int[] FirstChildEdgeIndex;
+        internal readonly uint[] FirstChildEdgeIndex;
         internal readonly int[] EdgeToNodeIndex;
         internal readonly char[] EdgeCharacter;
         internal readonly ushort[] ReachableTerminalNodes;
-        internal readonly long[] WordCounts;
+        internal readonly ulong[] WordCounts;
 
-        private int AssignCounts(int node, char[] builder, int builderLength, int reachableCount, Dictionary<string, long> counts)
+        private int AssignCounts(int node, char[] builder, int builderLength, int reachableCount, Dictionary<string, ulong> counts)
         {
             if (node < 0)
             {
@@ -61,11 +61,11 @@ namespace portent
         {
             return new CompressedSparseRowGraph(
                 stream.Read<int>(),
-                stream.ReadCompressedIntArray(),
+                stream.ReadCompressedUIntArray(),
                 stream.ReadArray<int>(),
                 stream.ReadCharArray(),
                 stream.ReadCompressedUshortArray(),
-                stream.ReadCompressedLongArray());
+                stream.ReadCompressedULongArray());
         }
 
         public void Save(string path)

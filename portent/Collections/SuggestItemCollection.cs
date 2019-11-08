@@ -1,13 +1,26 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+#if DEBUG
+using System.Diagnostics;
+#endif
 
 namespace portent
 {
-    internal sealed class SuggestItemCollection : IEnumerable<SuggestItem>, IDisposable
+    internal sealed class SuggestItemCollection : IEnumerable<SuggestItem>
     {
         public SuggestItemCollection(int count)
         {
+            if (count < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(count), "count cannot be less than 0");
+            }
+
+            if (count == 0)
+            {
+                count = 1;
+            }
+
             Items = new SuggestItem[count];
 #if DEBUG
             Capacity = count;
@@ -22,7 +35,8 @@ namespace portent
 #else
         internal readonly SuggestItem[] Items;
 #endif
-        public void Add(in SuggestItem item)
+
+        public void Add(string value, ulong count)
         {
 #if DEBUG
             if (Count == Capacity)
@@ -30,8 +44,13 @@ namespace portent
                 Capacity *= 2;
                 Array.Resize(ref Items, Capacity);
             }
+            else
+            {
+                Debug.Assert(Items != null);
+                Debug.Assert(Count < Items.Length);
+            }
 #endif
-            Items[Count++] = item;
+            Items[Count++] = new SuggestItem(value, count);
         }
 
         public void Clear()
@@ -53,22 +72,24 @@ namespace portent
             return _myEnumerator;
         }
 
-        public void Dispose()
-        {
-            _myEnumerator.Dispose();
-        }
-
         public int Count { get; private set; }
 
         private sealed class SuggestItemEnumerator : IEnumerator<SuggestItem>
         {
             private readonly SuggestItemCollection _myList;
-            public readonly SuggestItem[] Items;
+#if DEBUG
+            public readonly SuggestItem[] _items;
+#else
+            private readonly SuggestItem[] _items;
+#endif
 
             public SuggestItemEnumerator(SuggestItemCollection myList)
             {
                 _myList = myList;
-                Items = _myList.Items;
+                _items = _myList.Items;
+                _index = 0;
+                _count = _myList.Count;
+                Current = default;
             }
 
             private int _index;
@@ -80,9 +101,10 @@ namespace portent
 
             public bool MoveNext()
             {
+                // ReSharper disable once InvertIf - Use most predicted branch first.
                 if (_index < _count)
                 {
-                    Current = Items[_index];
+                    Current = _items[_index];
                     ++_index;
                     return true;
                 }
