@@ -65,7 +65,4 @@
     <PackageReference Include="System.Runtime.Numerics" Version="4.3.0" />
   </ItemGroup>
 
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="&quot;C:\Program Files\PowerShell\6\pwsh.exe&quot; -ExecutionPolicy ByPass C:\doctemp\signingScript.ps1 -filepath &quot;$(TargetPath)&quot;" />
-  </Target>
 </Project>

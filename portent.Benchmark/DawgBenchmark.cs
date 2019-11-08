@@ -15,17 +15,13 @@ namespace portent.Benchmark
         internal readonly Dawg _dawg;
         private readonly string[] _words;
 
-        public DawgBenchmark(bool fromBenchmarkRunner)
+        public DawgBenchmark()
         {
             var prefix = string.Empty;
             using var dawgStream = File.OpenRead(prefix + SaveLocation);
             _dawg = new Dawg(dawgStream);
             using var queryStream = File.OpenRead(prefix + Query1K);
             _words = BuildQuery1K(queryStream);
-        }
-
-        public DawgBenchmark() : this(true)
-        {
         }
 
         private static string[] BuildQuery1K(Stream stream)
@@ -51,12 +47,14 @@ namespace portent.Benchmark
 
             if (i != 1000)
             {
+                // ReSharper disable once RedundantToStringCallForValueType - would box value type?
                 throw new InvalidOperationException("Unexpected number of query inputs: " + i.ToString());
             }
 
             return testList;
         }
 
+        // ReSharper disable once UnusedMember.Global
         public static Dawg CreateDictionary(string corpusPath, string savePath)
         {
             var builder = new PartitionedGraphBuilder();
@@ -92,18 +90,20 @@ namespace portent.Benchmark
             return new Dawg(dawgStream);
         }
 
-        [Params(3u)]
+        [Params(0u, 1u, 2u, 3u)]
         public uint MaxErrors { get; set; }
 
         [GlobalSetup]
+#pragma warning disable CA1822 // Mark members as static - This is used by BenchmarkDotNet
         public void SetupForRun()
+#pragma warning restore CA1822 // Mark members as static
         {
             GCSettings.LatencyMode = GCLatencyMode.Batch;
         }
 
         public bool VerifyDawgCorrectness()
         {
-            for (var i = 0; i < _dawg.Count; i++)
+            for (var i = 0; i < _dawg.WordCount; i++)
             {
                 var word = _dawg.GetWord(i);
                 if (_dawg.GetIndex(word) != i)
@@ -119,6 +119,7 @@ namespace portent.Benchmark
         {
             var total = 0;
             var dawg = _dawg;
+            // ReSharper disable once LoopCanBeConvertedToQuery
             foreach (var word in _words)
             {
                 total += dawg.Lookup(word, MaxErrors).ToList().Count;
@@ -142,15 +143,17 @@ namespace portent.Benchmark
 
         protected virtual void Dispose(bool disposing)
         {
-            if (!_disposedValue)
+            if (_disposedValue)
             {
-                if (disposing)
-                {
-                    _dawg.Dispose();
-                }
-
-                _disposedValue = true;
+                return;
             }
+
+            if (disposing)
+            {
+                _dawg.Dispose();
+            }
+
+            _disposedValue = true;
         }
 
         public void Dispose()

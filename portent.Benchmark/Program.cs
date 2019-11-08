@@ -22,7 +22,7 @@ namespace portent.Benchmark
         private static void RunForProfiler()
         {
             Console.WriteLine("reading");
-            using var benchmark = new DawgBenchmark(false);
+            using var benchmark = new DawgBenchmark();
             Console.WriteLine("setup for run");
             benchmark.SetupForRun();
             Console.WriteLine("verify correctness");
@@ -38,7 +38,6 @@ namespace portent.Benchmark
             {
                 benchmark.MaxErrors = i;
                 Console.WriteLine(benchmark.GetTotalResults());
-
             }
 
             Console.WriteLine("Done, press {ENTER} to continue...");
