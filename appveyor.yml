@@ -52,7 +52,7 @@ configuration: Release
 # "project" is relative to the original build directory and not influenced by directory changes in "before_build".
 build:
   # path to Visual Studio solution or project
-  project: portent.sln
+  project: AllProjects.sln
   # MSBuild verbosity level
   verbosity: minimal
 

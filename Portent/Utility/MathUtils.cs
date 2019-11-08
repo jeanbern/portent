@@ -1,7 +1,7 @@
 ﻿using System.Diagnostics.Contracts;
 using System.Runtime.CompilerServices;
 
-namespace portent
+namespace Portent
 {
     public static class MathUtils
     {

@@ -43,14 +43,14 @@ mkdir $report_folder | Out-Null
 
 $report_file = "$report_folder\portent_coverage.xml"
 
-$target_dll = "..\portent.Test\bin\Release\netcoreapp3.0\portent.Test.dll"
+$target_dll = "..\Portent.Test\bin\Release\netcoreapp3.0\Portent.Test.dll"
 
 &$opencover_console `
 	-register:user `
 	-threshold:1 -oldStyle `
 	-returntargetcode `
 	-hideskipped:All `
-	-filter:"+[portent*]* -[portent.Test*]*" `
+	-filter:"+[Portent*]* -[Portent.Test*]*" `
 	-excludebyattribute:*.ExcludeFromCodeCoverage* `
 	-excludebyfile:*\*Designer.cs `
 	-output:"$report_file" `
