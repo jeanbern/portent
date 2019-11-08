@@ -39,7 +39,11 @@ namespace portent
     [Flags]
     [SuppressMessage("Major Code Smell", "S4070:Non-flags enums should not be marked with \"FlagsAttribute\"", Justification = "Copied from Microsoft.")]
     [PublicAPI]
+#pragma warning disable CA2217 // Do not mark enums with FlagsAttribute
+#pragma warning disable RCS1135 // Declare enum member with zero value (when enum has FlagsAttribute).
     public enum TokenAccessLevels
+#pragma warning restore RCS1135 // Declare enum member with zero value (when enum has FlagsAttribute).
+#pragma warning restore CA2217 // Do not mark enums with FlagsAttribute
     {
         AssignPrimary = 0x00000001,
         Duplicate = 0x00000002,
@@ -51,6 +55,7 @@ namespace portent
         AdjustDefault = 0x00000080,
         AdjustSessionId = 0x00000100,
 
+#pragma warning disable RCS1157 // Composite enum value contains undefined flag.
         Read = 0x00020000 | Query,
 
         Write = 0x00020000 | AdjustPrivileges | AdjustGroups | AdjustDefault,
@@ -65,6 +70,7 @@ namespace portent
                               AdjustGroups |
                               AdjustDefault |
                               AdjustSessionId,
+#pragma warning restore RCS1157 // Composite enum value contains undefined flag.
 
         MaximumAllowed = 0x02000000
     }

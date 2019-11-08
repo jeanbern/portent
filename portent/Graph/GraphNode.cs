@@ -36,6 +36,7 @@ namespace portent
         /// This contains the parents. Elements are removed from it during Topological Ordering.
         /// </summary>
         public HashSet<GraphNode> Parents { get; } = new HashSet<GraphNode>();
+
         /// <summary>
         /// This is a snapshot of the Parents. Assigned during Topological Ordering and not modified.
         /// </summary>
@@ -135,6 +136,7 @@ namespace portent
         }
 
         private int _cachedHash;
+
         private int PrivateHash()
         {
             if (_cachedHash != 0)

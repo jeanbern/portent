@@ -26,7 +26,9 @@ namespace portent
         PageReadwrite = 0x04,
         PageWritecopy = 0x08,
         PageTargetsInvalid = 0x40000000,
+#pragma warning disable RCS1234 // Duplicate enum value.
         PageTargetsNoUpdate = 0x40000000,
+#pragma warning restore RCS1234 // Duplicate enum value.
 
         PageGuard = 0x100,
         PageNocache = 0x200,

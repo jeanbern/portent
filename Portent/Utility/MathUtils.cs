@@ -10,7 +10,8 @@ namespace portent
         [JetBrains.Annotations.PublicAPI]
         public static int PositiveOrZeroNonBranching(int x)
         {
-            return x - (x & (x >> (sizeof(int) * 8 - 1)));
+            // ReSharper disable once ArrangeRedundantParentheses
+            return x - (x & (x >> ((sizeof(int) * 8) - 1)));
         }
 
         [Pure]
@@ -18,7 +19,8 @@ namespace portent
         [JetBrains.Annotations.PublicAPI]
         public static long PositiveOrZeroNonBranching(long x)
         {
-            return x - (x & (x >> (sizeof(long) * 8 - 1)));
+            // ReSharper disable once ArrangeRedundantParentheses
+            return x - (x & (x >> ((sizeof(long) * 8) - 1)));
         }
 
         /// <summary>
@@ -29,7 +31,8 @@ namespace portent
         [JetBrains.Annotations.PublicAPI]
         public static int Abs(int value)
         {
-            var mask = value >> (sizeof(int) * 8 - 1);
+            // ReSharper disable once ArrangeRedundantParentheses
+            var mask = value >> ((sizeof(int) * 8) - 1);
             return (value + mask) ^ mask;
         }
 
@@ -41,7 +44,8 @@ namespace portent
         [JetBrains.Annotations.PublicAPI]
         public static long Abs(long value)
         {
-            var mask = value >> (sizeof(long) * 8 - 1);
+            // ReSharper disable once ArrangeRedundantParentheses
+            var mask = value >> ((sizeof(long) * 8) - 1);
             return (value + mask) ^ mask;
         }
 
@@ -49,7 +53,8 @@ namespace portent
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int Min(int x, int y)
         {
-            return y + ((x - y) & ((x - y) >> (sizeof(int) * 8 - 1)));
+            // ReSharper disable once ArrangeRedundantParentheses
+            return y + ((x - y) & ((x - y) >> ((sizeof(int) * 8) - 1)));
         }
 
         [Pure]
@@ -60,7 +65,8 @@ namespace portent
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static long Min(long x, long y)
         {
-            return y + ((x - y) & ((x - y) >> (sizeof(long) * 8 - 1)));
+            // ReSharper disable once ArrangeRedundantParentheses
+            return y + ((x - y) & ((x - y) >> ((sizeof(long) * 8) - 1)));
         }
 
         [Pure]
@@ -73,14 +79,16 @@ namespace portent
         [JetBrains.Annotations.PublicAPI]
         public static uint RotateRight(uint x, int n)
         {
-            return (x >> n) | (x << (sizeof(uint) * 8 - n));
+            // ReSharper disable once ArrangeRedundantParentheses
+            return (x >> n) | (x << ((sizeof(uint) * 8) - n));
         }
 
         [Pure]
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static ulong RotateRight(ulong x, int n)
         {
-            return (x >> n) | (x << (sizeof(ulong) * 8 - n));
+            // ReSharper disable once ArrangeRedundantParentheses
+            return (x >> n) | (x << ((sizeof(ulong) * 8) - n));
         }
 
         [Pure]

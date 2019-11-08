@@ -69,7 +69,6 @@ namespace portent
             var privileges = new LuidAndAttributes(_luid, SePrivilegeAttributes.SePrivilegeEnabled);
             var newState = new TokenPrivilege(privileges);
 
-
             // Place the new privilege on the thread token and remember the previous state.
             if (!NativeMethods.AdjustTokenPrivileges(
                 _tlsContents.ThreadHandle,
@@ -445,7 +444,6 @@ namespace portent
                 // ReSharper disable once ArrangeRedundantParentheses
                 Debug.Assert(sizeof(uint) + (asRef * Unsafe.SizeOf<LuidAndAttributes>()) == returnLength2);
                 return HasPrivilege(ref Unsafe.As<byte, int>(ref asRef), privilegeLuid);
-
             }
 
             private static bool HasPrivilege(ref int resultPointer, in Luid privilegeLuid)
@@ -453,8 +451,8 @@ namespace portent
                 var resultCount = resultPointer;
                 for (var i = 0; i < resultCount; i++)
                 {
-                    var high = Unsafe.Add(ref resultPointer, 1 + 3 * i);
-                    var low = Unsafe.Add(ref resultPointer, 2 + 3 * i);
+                    var high = Unsafe.Add(ref resultPointer, 1 + (3 * i));
+                    var low = Unsafe.Add(ref resultPointer, 2 + (3 * i));
                     if (high == privilegeLuid.HighPart && low == privilegeLuid.LowPart)
                     {
                         return true;

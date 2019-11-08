@@ -236,6 +236,7 @@ namespace portent
                 innerStopwatch.Start();
                 foreach (var current in window)
                 {
+                    // ReSharper disable once ForeachCanBePartlyConvertedToQueryUsingAnotherGetEnumerator
                     foreach (var childEdge in current.ChildEdges.Values)
                     {
                         if (!potentials.Contains(childEdge.Target))
@@ -260,6 +261,7 @@ namespace portent
 
                     foreach (var parent in current.ParentCopy)
                     {
+                        // ReSharper disable once ForeachCanBePartlyConvertedToQueryUsingAnotherGetEnumerator
                         foreach (var childEdge in parent.ChildEdges.Values)
                         {
                             if (!potentials.Contains(childEdge.Target))
