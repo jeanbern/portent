@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Runtime;
 
 namespace Portent
 {
@@ -11,9 +10,6 @@ namespace Portent
         public CompressedSparseRowGraph AsCompressedSparseRows()
         {
             var root = Finish();
-
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
 
             var edges = EdgeCount;
             var allNodes = OrderedNodes;
@@ -45,9 +41,6 @@ namespace Portent
             }
 
             var wordCounts = new ulong[WordCount];
-
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
 
             return new CompressedSparseRowGraph(rootNodeIndex, firstChildEdgeIndex, edgeToNodeIndex, edgeCharacter, reachableTerminalNodes, wordCounts, _counts);
         }

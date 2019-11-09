@@ -165,9 +165,13 @@ namespace Portent
         public static unsafe void ReadUtf8(this Stream stream, char* pointer, uint byteLength, uint charLength)
         {
             Span<byte> span = stackalloc byte[(int) byteLength];
-            stream.Read(span);
+            // ReSharper disable once RedundantAssignment
+            var read = stream.Read(span);
+            Debug.Assert(read == byteLength);
             var spp = new Span<char>(pointer, (int) charLength);
-            Utf8NoBom.GetChars(span, spp);
+            // ReSharper disable once RedundantAssignment
+            var converted = Utf8NoBom.GetChars(span, spp);
+            Debug.Assert(converted == charLength);
         }
 
         #endregion Read

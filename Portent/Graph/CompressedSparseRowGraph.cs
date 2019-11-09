@@ -39,16 +39,10 @@ namespace Portent
             EdgeToNodeIndex = MemoryChunk.GetArrayAligned<int>(edgeToNodeIndexCount);
             stream.ReadCompressed(EdgeToNodeIndex, edgeToNodeIndexCount);
 
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
-
             var byteLength = stream.ReadCompressedUInt();
             var charLength = stream.ReadCompressedUInt();
             EdgeCharacter = MemoryChunk.GetArrayAligned<char>(charLength);
             stream.ReadUtf8(EdgeCharacter, byteLength, charLength);
-
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
 
             var reachableTerminalNodesCount = stream.ReadCompressedUInt();
             ReachableTerminalNodes = MemoryChunk.GetArrayAligned<ushort>(reachableTerminalNodesCount);
@@ -62,7 +56,7 @@ namespace Portent
         }
     }
 
-    public sealed class CompressedSparseRowGraph
+    public sealed class CompressedSparseRowGraph : IDisposable
     {
         internal CompressedSparseRowGraph(int rootNodeIndex, uint[] firstChildEdgeIndex, int[] edgeToNodeIndex, char[] edgeCharacter, ushort[] reachableTerminalNodes, ulong[] data, Dictionary<string, ulong> wordCounts)
             : this(rootNodeIndex, firstChildEdgeIndex, edgeToNodeIndex, edgeCharacter, reachableTerminalNodes, data)
@@ -149,6 +143,14 @@ namespace Portent
             stream.WriteUtf8(EdgeCharacter);
             stream.WriteCompressed(ReachableTerminalNodes);
             stream.WriteCompressed(WordCounts);
+        }
+
+        public void Dispose()
+        {
+            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+#pragma warning disable S1215 // "GC.Collect" should not be called
+            GC.Collect();
+#pragma warning restore S1215 // "GC.Collect" should not be called
         }
     }
 }

@@ -5,7 +5,6 @@
     <LangVersion>8.0</LangVersion>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <PlatformTarget>x64</PlatformTarget>
-    <DefineConstants>BIT64</DefineConstants>
 
     <SignAssembly>false</SignAssembly>
     <DelaySign>false</DelaySign>
@@ -26,7 +25,7 @@
     <DebugType>pdbonly</DebugType>
     <DebugSymbols>true</DebugSymbols>
     <Optimize>true</Optimize>
-    <DefineConstants>TRACE;BIT64</DefineConstants>
+    <DefineConstants>TRACE</DefineConstants>
 
     <!-- Use together -->
     <!--<PublishSingleFile>true</PublishSingleFile>
@@ -50,6 +49,10 @@
     <Compile Remove="DawgFromHome.cs" />
     <Compile Remove="SafeOldDawg.cs" />
     <Compile Remove="SaferDawg.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\.editorconfig" Link=".editorconfig" />
   </ItemGroup>
 
   <ItemGroup>

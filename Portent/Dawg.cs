@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Contracts;
 using System.IO;
 using System.Linq;
@@ -14,16 +15,11 @@ using LocalsInit;
 
 // ReSharper disable BuiltInTypeReferenceStyle
 
-#if BIT64
 // Use nint when referring to pointer values, long when referring to 64 bit values.
 using nint = System.Int64;
 using nuint = System.UInt64;
 // ReSharper disable SuggestVarOrType_BuiltInTypes
 // ReSharper disable SuggestVarOrType_Elsewhere
-#else
-using nint = System.Int32;
-using nuint = System.UInt32;
-#endif
 
 namespace Portent
 {
@@ -48,9 +44,11 @@ namespace Portent
             _compoundResultCollection.Clear();
             var wordLength = (uint) word.Length;
 
-            // TODO: Align these allocated chunks together.
+#pragma warning disable S1135 // Track uses of "TODO" tags
+// TODO: Align these allocated chunks together.
             // + 1 for the (char)0 at the start.
             var inputLength = MemoryAlignmentHelper.GetCacheAlignedSize<char>(wordLength + 1);
+#pragma warning restore S1135 // Track uses of "TODO" tags
             var inputBytes = stackalloc byte[inputLength];
             var input = MemoryAlignmentHelper.GetCacheAlignedStart<char>(inputBytes);
             *input = (char) 0;
@@ -81,7 +79,7 @@ namespace Portent
             var run = stackalloc Run[1];
             run[0] = new Run(input, toCache, wordLength, maxPlusOne);
             // TODO: There's got to be a simpler way of doing this. Not a high priority though.
-            var hasRun = stackalloc bool[(int) rootLast - (int) rootFirst];
+            var hasRun = stackalloc bool[(int)(rootLast -  rootFirst)];
             for (nint i = 0; i < rootLast - rootFirst; i++)
             {
                 hasRun[i] = false;
@@ -131,6 +129,7 @@ namespace Portent
 
         [LocalsInit(false)]
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+        [SuppressMessage("Major Code Smell", "S907:\"goto\" statement should not be used")]
         private static void Search5(Job me)
         {
             Run* run = me._run;
@@ -159,7 +158,6 @@ namespace Portent
 
             var allBytes = stackalloc byte[(int)bytesRequiredTotal];
 
-            //var builderAlloc = stackalloc byte[builderByteLength];
             var builderStart = MemoryAlignmentHelper.GetCacheAlignedStart<char>(allBytes);
             *builderStart = (char)0;
             builderStart++;
@@ -179,7 +177,7 @@ namespace Portent
             // Row 1 is the first character and so on...
             // And we sneak in an extra row before row0, to ensure that the transposition row offset has room.
             closureArg._transpositionRow = (uint*) 0;
-            closureArg._row0 = editMatrix;// + twiceMaxPlusOne;
+            closureArg._row0 = editMatrix;
             editMatrix--;
             nint x = 0;
             nint diagonal = 0;
@@ -197,6 +195,7 @@ namespace Portent
                 nuint builderDepth = closure._builderDepth;
                 uint* previousRow = closure._row0;
                 uint mp1 = closure._maxPlusOne;
+
                 // This is the value for the column directly before our diagonal stripe.
                 // For the early rows, it's the 0'th column. After that, the value is > maxPlusOne anyways.
                 // TODO: Potentially a place to cut down on an addition or two, if it fits in the branching done above.
@@ -209,8 +208,8 @@ namespace Portent
                 char* firstWithOffset = closure._first;
                 uint to = closure._wordLength;
 
-                //char previousWordCharacter;
                 uint previousRowPreviousColumn;
+
                 // Very predictable branching
                 if (wordArrayOffset > 0)
                 {
@@ -224,7 +223,7 @@ namespace Portent
                     }
                     else
                     {
-                        //TODO: I could move this out of the if-else and make the if do ++ instead of +=. Does this affect latency?
+                        //TODO: Test alternative: move this outside of the conditional, and change the previous addition to +1?
                         transpositionRow++;
                     }
 
@@ -240,6 +239,7 @@ namespace Portent
                 // I tried to arrange these so that the order of operations leaves them as far away as possible from ops affecting their values.
                 // To reduce latency.
                 closure._transpositionRow = transpositionRow;
+
                 // TODO: is this one predictable?
                 if (t2 < to)
                 {
@@ -250,7 +250,6 @@ namespace Portent
 
                 // Save a read by combining both characters into one register. Used ulong because comparison is best done between two int32
                 // Shift the previous-previous character into the high bits, putting the previous character into the bottom 2.
-                // 00ab -> //b00a | so (uint)edgeCharacter == 0a, (uint) (edgeCharacter >> 48) == 0b
                 // Make sure it's unsigned so that >> 48 will shift 0's
                 ulong edgeCharacter = MathUtils.RotateRight((ulong) *(uint*) (closure._builderStart + builderDepth - 1), 16);
 
@@ -260,16 +259,12 @@ namespace Portent
                 do
                 {
                     uint previousRowCurrentColumn = previousRow[j];
-
                     ulong wordCharacter = MathUtils.RotateRight((ulong) *(uint*) (firstWithOffset + j - 1), 16);
-                    //uint wordCharacter = *(uint*) (firstWithOffset + j - 1);
-
                     if ((uint) edgeCharacter != (uint) wordCharacter)
                     {
                         // Non-branching Min() call here because it's not predictable.
                         currentRowPreviousColumn = MathUtils.Min(currentRowPreviousColumn, previousRowCurrentColumn);
                         uint diagonalEntry;
-                        //if ((uint) edgeCharacter != (uint) (wordCharacter >> 48) || (uint) (edgeCharacter >> 48) != (uint) wordCharacter)
                         // ReSharper disable once ConvertIfStatementToConditionalTernaryExpression
                         if (edgeCharacter != ((wordCharacter >> 48) | (wordCharacter << 48)))
                         {
@@ -291,13 +286,14 @@ namespace Portent
                     }
 
                     currentRow[j] = currentRowPreviousColumn;
-                    // Doing this here removes a pause between ++ and < in (++j < to)
+
+                    // Doing this here to reduce latency between the add and the conditional
                     ++j;
 
                     // Will make `any` negative if currentRowPreviousColumn < maxErrors
                     any |= (int) currentRowPreviousColumn - (int) maxPlusOne;
                     previousRowPreviousColumn = previousRowCurrentColumn;
-                } while ((uint)j < to);
+                } while ((uint) j < to);
 
                 if (any >= 0)
                 {
@@ -315,6 +311,7 @@ namespace Portent
                         string stringResult = new string(bs, 0, (int)newDepth);
                         ulong count = GetWordCount(bs, newDepth, closure._graph);
                         closure._results.Add(stringResult, count);
+
                         // If we followed this branch, the register was overwritten.
                         // Fetch the value from the correct place instead of having the compiler store it on the stack.
                         maxPlusOne = closure._maxPlusOne;
@@ -376,7 +373,9 @@ namespace Portent
                 ulong temp = *(ulong*) (closure._graph._firstChildEdgeIndex + (uint) closure._node);
                 // This one is used an a pointer offset, so it can be nuint. Also, taking only the lower 32 bits.
                 // ReSharper disable once RedundantCast - Just being explicit and clear
+#pragma warning disable IDE0004, S1905 // Remove Unnecessary Cast
                 nuint childEdge = (nuint) (uint) temp;
+#pragma warning restore IDE0004, S1905 // Remove Unnecessary Cast
                 // Upper 32 bits. Not used as an offset, so keep as uint.
                 uint childEdgeEnd = (uint) (temp >> 32);
 
@@ -386,7 +385,6 @@ namespace Portent
                 }
 
                 // TODO: We have some extra registers to store stuff in, and they're getting push-popped anyways. Load things and prevent re-reading from memory.
-                // TODO: make a BIT64 distinction. We don't have all those extra registers in 32 bit mode.
                 uint* row0 = closure._row0;
                 closure._builderDepth = newDepth;
                 // casting to byte* because otherwise it was doing both shl 1 and shl 2 to double _maxPlusOne and then convert it to pointer moves
@@ -416,6 +414,7 @@ namespace Portent
             MatchCharacter(ref closureArg, 0);
         }
 
+#pragma warning disable S3898 //Value types should implement "IEquatable<T>"
         private readonly ref struct Run
         {
             public readonly char* _input;
@@ -431,6 +430,7 @@ namespace Portent
                 _maxPlusOne = maxPlusOne;
             }
         }
+#pragma warning restore S3898 //Value types should implement "IEquatable<T>"
 
         private class Job
         {
@@ -458,6 +458,7 @@ namespace Portent
         }
 
         [StructLayout(LayoutKind.Explicit)]
+#pragma warning disable S3898 //Value types should implement "IEquatable<T>"
         private readonly struct DawgGraph
         {
             [FieldOffset(0x00)] //48
@@ -488,6 +489,7 @@ namespace Portent
                 _rootNodeIndex = rootNodeIndex;
             }
         }
+#pragma warning restore S3898 //Value types should implement "IEquatable<T>"
 
         [Pure]
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
@@ -507,12 +509,16 @@ namespace Portent
                 char target = *word;
                 word++;
                 // ReSharper disable once RedundantCast - Just being explicit and clear
+#pragma warning disable IDE0004 // Remove Unnecessary Cast
                 nuint i = (nuint) edgeChildIndex[currentNode];
+#pragma warning restore IDE0004 // Remove Unnecessary Cast
                 uint lastChildIndex = edgeChildIndex[currentNode+1];
                 do
                 {
                     // ReSharper disable once RedundantCast - Just being explicit and clear
+#pragma warning disable IDE0004, S1905 // Remove Unnecessary Cast
                     currentNode = (nint)edgeNodeIndex[i];
+#pragma warning restore IDE0004, S1905 // Remove Unnecessary Cast
                     char currentEdgeChar = characters[i];
                     i++;
                     if (currentEdgeChar != target)
@@ -541,6 +547,7 @@ namespace Portent
         }
 
         [StructLayout(LayoutKind.Explicit)]
+#pragma warning disable S3898 //Value types should implement "IEquatable<T>"
         private ref struct Search3Closure
         {
             #region CacheLine1
@@ -582,6 +589,7 @@ namespace Portent
             public SuggestItemCollection _results;
             #endregion CacheLine3
         }
+#pragma warning restore S3898 //Value types should implement "IEquatable<T>"
 
         public uint WordCount { get; }
 
@@ -695,7 +703,9 @@ namespace Portent
 #pragma warning restore S907 // "goto" statement should not be used
                 }
 
+#pragma warning disable S907 // "goto" statement should not be used
                 goto singleReturnPoint;
+#pragma warning restore S907 // "goto" statement should not be used
 
                 nextIteration:
 #pragma warning disable S1116 // Empty statements should be removed - This statement is important. It allows the label/goto to work.

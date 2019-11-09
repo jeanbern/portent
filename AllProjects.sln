@@ -13,6 +13,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{E866D3C8-0885-4C79-BA12-9DE39C922925}"
 	ProjectSection(SolutionItems) = preProject
 		.codecov.yml = .codecov.yml
+		.editorconfig = .editorconfig
 		appveyor.yml = appveyor.yml
 		LICENSE = LICENSE
 		README.md = README.md

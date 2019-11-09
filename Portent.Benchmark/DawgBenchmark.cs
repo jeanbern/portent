@@ -84,8 +84,11 @@ namespace Portent.Benchmark
                 }
             }
 
-            var compressedGraph = builder.AsCompressedSparseRows();
-            compressedGraph.Save(savePath);
+            using (var compressedGraph = builder.AsCompressedSparseRows())
+            {
+                compressedGraph.Save(savePath);
+            }
+
             using var dawgStream = File.OpenRead(savePath);
             return new Dawg(dawgStream);
         }

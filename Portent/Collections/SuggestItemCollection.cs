@@ -7,7 +7,7 @@ using System.Diagnostics;
 
 namespace Portent
 {
-    internal sealed class SuggestItemCollection : IEnumerable<SuggestItem>
+    internal sealed class SuggestItemCollection : IEnumerable<SuggestItem>, IDisposable
     {
         public SuggestItemCollection(int count)
         {
@@ -122,6 +122,12 @@ namespace Portent
             {
                 //Empty - Required by IEnumerator<T>, but nothing to dispose.
             }
+        }
+
+        public void Dispose()
+        {
+            // So useless
+            _myEnumerator.Dispose();
         }
     }
 }

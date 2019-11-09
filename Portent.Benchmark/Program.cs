@@ -11,7 +11,7 @@ namespace Portent.Benchmark
         {
             if (Debugger.IsAttached)
             {
-                RunForProfiler();
+                PrintResultCounts();
             }
             else
             {
@@ -19,13 +19,10 @@ namespace Portent.Benchmark
             }
         }
 
-        private static void RunForProfiler()
+        private static void PrintResultCounts()
         {
-            Console.WriteLine("reading");
             using var benchmark = new DawgBenchmark();
-            Console.WriteLine("setup for run");
             benchmark.SetupForRun();
-            Console.WriteLine("verify correctness");
             if (!benchmark.VerifyDawgCorrectness())
             {
                 throw new InvalidOperationException();
@@ -40,7 +37,6 @@ namespace Portent.Benchmark
                 Console.WriteLine(benchmark.GetTotalResults());
             }
 
-            Console.WriteLine("Done, press {ENTER} to continue...");
             Console.ReadLine();
         }
     }

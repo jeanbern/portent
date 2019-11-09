@@ -29,7 +29,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
-
+#pragma warning disable S3453 // Classes should not have only "private" constructors
 namespace Portent
 {
     /// <summary>
