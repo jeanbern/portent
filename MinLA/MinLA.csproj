@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Portent\Portent.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="ChacoSharp">
+      <HintPath>..\..\..\Users\JPelleri\source\repos\ChacoSharp\bin\Release\netcoreapp3.1\ChacoSharp.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

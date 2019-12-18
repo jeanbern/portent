@@ -116,7 +116,7 @@ namespace Portent
             /// If the processor does not support large pages, the return value is zero.
             /// </returns>
             /// <remarks>
-            /// The minimum large page size varies, but it is typically 2 MB or greater.
+            /// The minimum large page size varies, but it is typically 2 MB or greater. (Actually MiB)
             /// </remarks>
             /// <see>
             /// <cref>https://docs.microsoft.com/en-us/windows/win32/api/memoryapi/nf-memoryapi-getlargepageminimum</cref>

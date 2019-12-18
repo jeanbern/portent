@@ -28,6 +28,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Portent.Test", "Portent.Tes
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Portent.Benchmark", "Portent.Benchmark\Portent.Benchmark.csproj", "{BD1A249D-0576-49EE-BC96-63B9545674BE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MinLA", "MinLA\MinLA.csproj", "{382F1CE8-1B54-4CFC-801A-05883A89295C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -46,6 +48,10 @@ Global
 		{BD1A249D-0576-49EE-BC96-63B9545674BE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BD1A249D-0576-49EE-BC96-63B9545674BE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BD1A249D-0576-49EE-BC96-63B9545674BE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{382F1CE8-1B54-4CFC-801A-05883A89295C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{382F1CE8-1B54-4CFC-801A-05883A89295C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{382F1CE8-1B54-4CFC-801A-05883A89295C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{382F1CE8-1B54-4CFC-801A-05883A89295C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

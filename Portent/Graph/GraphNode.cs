@@ -12,11 +12,6 @@ namespace Portent
         public Dictionary<char, GraphNode> Children { get; } = new Dictionary<char, GraphNode>();
 
         /// <summary>
-        /// This can contain a copy of Children. It is assigned during Topological Ordering and the elements are removed one by one.
-        /// </summary>
-        public HashSet<GraphNode>? ChildrenCopy;
-
-        /// <summary>
         /// This will be equivalent to Children. It should contain more accurate Count information: tracked at the edge level instead of by node.
         /// </summary>
         public readonly Dictionary<char, GraphEdge> ChildEdges = new Dictionary<char, GraphEdge>();
@@ -37,61 +32,35 @@ namespace Portent
         /// </summary>
         public HashSet<GraphNode> Parents { get; } = new HashSet<GraphNode>();
 
-        /// <summary>
-        /// This is a snapshot of the Parents. Assigned during Topological Ordering and not modified.
-        /// </summary>
-        public GraphNode[]? ParentCopy;
-
         public bool IsTerminal { get; set; }
         public int ReachableTerminalNodes { get; private set; } = -1;
         public long Count { get; set; }
         public bool Visited { get; set; }
         public int OrderedId { get; set; }
 
-        public void TopologicalSortChildren(List<GraphNode> results)
+        public (int nodeCount, int edgeCount) GatherNodesCountEdges()
         {
             if (Visited)
             {
-                //TODO: will this even be hit?
-                return;
-            }
-
-            Visited = true;
-            foreach (var (_, node) in SortedChildren.Reverse())
-            {
-                if (!node.Visited)
-                {
-                    node.TopologicalSortChildren(results);
-                }
-            }
-
-            results.Add(this);
-        }
-
-        public int GatherNodesCountEdges(ICollection<GraphNode> nodes)
-        {
-            if (Visited)
-            {
-                return 0;
+                return (0, 0);
             }
 
             Visited = true;
 
             var totalEdges = 0;
-
-            nodes.Add(this);
-
+            var totalNodes = 1;
             foreach (var (_, node) in Children)
             {
                 node.Parents.Add(this);
                 // ReSharper disable once PossibleNullReferenceException
-                var childEdges = node.GatherNodesCountEdges(nodes);
+                var (childCount, childEdges) = node.GatherNodesCountEdges();
                 Count += node.Count;
                 //Add 1 to represent the edge to the child itself.
                 totalEdges += childEdges + 1;
+                totalNodes += childCount;
             }
 
-            return totalEdges;
+            return (totalNodes, totalEdges);
         }
 
         public int CalculateReachableTerminals()

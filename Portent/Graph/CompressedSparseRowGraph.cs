@@ -1,109 +1,99 @@
 ﻿using System;
 using System.Collections.Generic;
-#if DEBUG
-using System.Diagnostics;
-#endif
 using System.IO;
 using System.Runtime;
 
 namespace Portent
 {
-    public unsafe class CompressedSparseRowPointerGraph
-    {
-        internal readonly LargePageMemoryChunk MemoryChunk;
-        internal readonly int RootNodeIndex;
-        internal readonly uint* FirstChildEdgeIndex;
-        internal readonly int* EdgeToNodeIndex;
-        internal readonly char* EdgeCharacter;
-        internal readonly ushort* ReachableTerminalNodes;
-        internal readonly uint WordCount;
-        internal readonly ulong* WordCounts;
-
-        public static CompressedSparseRowPointerGraph Read(Stream stream)
-        {
-            return new CompressedSparseRowPointerGraph(stream);
-        }
-
-        public CompressedSparseRowPointerGraph(Stream stream)
-        {
-            var totalPageSize = stream.ReadCompressedULong();
-            MemoryChunk = new LargePageMemoryChunk(totalPageSize);
-
-            RootNodeIndex = stream.ReadCompressedInt();
-
-            var firstChildEdgeIndexCount = stream.ReadCompressedUInt();
-            FirstChildEdgeIndex = MemoryChunk.GetArrayAligned<uint>(firstChildEdgeIndexCount);
-            stream.ReadSequentialCompressedUshortToUint(FirstChildEdgeIndex, firstChildEdgeIndexCount);
-
-            var edgeToNodeIndexCount = stream.ReadCompressedUInt();
-            EdgeToNodeIndex = MemoryChunk.GetArrayAligned<int>(edgeToNodeIndexCount);
-            stream.ReadCompressed(EdgeToNodeIndex, edgeToNodeIndexCount);
-
-            var byteLength = stream.ReadCompressedUInt();
-            var charLength = stream.ReadCompressedUInt();
-            EdgeCharacter = MemoryChunk.GetArrayAligned<char>(charLength);
-            stream.ReadUtf8(EdgeCharacter, byteLength, charLength);
-
-            var reachableTerminalNodesCount = stream.ReadCompressedUInt();
-            ReachableTerminalNodes = MemoryChunk.GetArrayAligned<ushort>(reachableTerminalNodesCount);
-            stream.ReadCompressed(ReachableTerminalNodes, reachableTerminalNodesCount);
-
-            WordCount = stream.ReadCompressedUInt();
-            WordCounts = MemoryChunk.GetArrayAligned<ulong>(WordCount);
-            stream.ReadCompressed(WordCounts, WordCount);
-
-            MemoryChunk.Lock();
-        }
-    }
-
     public sealed class CompressedSparseRowGraph : IDisposable
     {
-        internal CompressedSparseRowGraph(int rootNodeIndex, uint[] firstChildEdgeIndex, int[] edgeToNodeIndex, char[] edgeCharacter, ushort[] reachableTerminalNodes, ulong[] data, Dictionary<string, ulong> wordCounts)
-            : this(rootNodeIndex, firstChildEdgeIndex, edgeToNodeIndex, edgeCharacter, reachableTerminalNodes, data)
-        {
-            AssignCounts(RootNodeIndex, new char[100], 0, -1, wordCounts);
-        }
-
-        private CompressedSparseRowGraph(int rootNodeIndex, uint[] firstChildEdgeIndex, int[] edgeToNodeIndex, char[] edgeCharacter, ushort[] reachableTerminalNodes, ulong[] data)
+        public CompressedSparseRowGraph(int rootNodeIndex, uint[] firstChildEdgeIndex, int[] edgeToNodeIndex, char[] edgeCharacters, ushort[] reachableTerminalNodes, Dictionary<string, ulong> wordCounts)
         {
             RootNodeIndex = rootNodeIndex;
             FirstChildEdgeIndex = firstChildEdgeIndex;
             EdgeToNodeIndex = edgeToNodeIndex;
-            EdgeCharacter = edgeCharacter;
+            EdgeCharacters = edgeCharacters;
             ReachableTerminalNodes = reachableTerminalNodes;
-            WordCounts = data;
+            WordCounts = new ulong[wordCounts.Count];
+            EdgeWeights = new float[edgeToNodeIndex.Length];
+            DictionaryCounts = wordCounts;
+
+            var reachableCount = AssignWordCounts(RootNodeIndex, new char[100], 0, -1) + 1;
+            if (reachableCount != wordCounts.Count)
+            {
+                throw new ArgumentException($"{nameof(wordCounts)} contained {wordCounts.Count} entries, but there were only {reachableCount} assignments.");
+            }
+
+            var first = FirstChildEdgeIndex[rootNodeIndex];
+            var last = FirstChildEdgeIndex[rootNodeIndex + 1];
+
+            foreach (var wordCount in wordCounts)
+            {
+                var word = wordCount.Key;
+                var count = wordCount.Value;
+                var target = word[0];
+                for (var i = first; i < last; i++)
+                {
+                    if (EdgeCharacters[i] == target)
+                    {
+                        AssignEdgeWeights(i, word, 1, count);
+                        break;
+                    }
+                }
+            }
         }
 
-        internal readonly int RootNodeIndex;
-        internal readonly uint[] FirstChildEdgeIndex;
-        internal readonly int[] EdgeToNodeIndex;
-        internal readonly char[] EdgeCharacter;
-        internal readonly ushort[] ReachableTerminalNodes;
-        internal readonly ulong[] WordCounts;
+        public readonly int RootNodeIndex;
+        public readonly uint[] FirstChildEdgeIndex;
+        public readonly int[] EdgeToNodeIndex;
+        public readonly char[] EdgeCharacters;
+        public readonly ushort[] ReachableTerminalNodes;
+        public readonly ulong[] WordCounts;
 
-        private int AssignCounts(int node, char[] builder, int builderLength, int reachableCount, Dictionary<string, ulong> counts)
+        public readonly float[] EdgeWeights;
+
+        public readonly Dictionary<string, ulong> DictionaryCounts;
+
+        private void AssignEdgeWeights(uint edge, string word, int wordIndex, ulong wordCount)
+        {
+            EdgeWeights[edge] += wordCount;
+            if (wordIndex == word.Length)
+            {
+                return;
+            }
+
+            var nextNode = Math.Abs(EdgeToNodeIndex[edge]);
+            var nextChar = word[wordIndex];
+            var first = FirstChildEdgeIndex[nextNode];
+            var last = FirstChildEdgeIndex[nextNode + 1];
+            for (var i = first; i < last; i++)
+            {
+                if (EdgeCharacters[i] == nextChar)
+                {
+                    AssignEdgeWeights(i, word, wordIndex + 1, wordCount);
+                }
+            }
+        }
+
+        private int AssignWordCounts(int node, char[] builder, int builderLength, int reachableCount)
         {
             if (node < 0)
             {
-                ++reachableCount;
-                var word = new string(builder, 0, builderLength);
-                WordCounts[reachableCount] = counts[word];
                 node = -node;
+                ++reachableCount;
+
+                var word = new string(builder, 0, builderLength);
+                WordCounts[reachableCount] = DictionaryCounts[word];
             }
 
             var i = FirstChildEdgeIndex[node];
             var last = FirstChildEdgeIndex[node + 1];
             for (; i < last; ++i)
             {
-                builder[builderLength] = EdgeCharacter[i];
+                builder[builderLength] = EdgeCharacters[i];
                 var nextNode = EdgeToNodeIndex[i];
 
-                var childReachable = AssignCounts(nextNode, builder, builderLength + 1, reachableCount, counts);
-#if DEBUG
-                var realReachable = ReachableTerminalNodes[Math.Abs(nextNode)];
-                Debug.Assert(realReachable == childReachable - reachableCount);
-#endif
-                reachableCount = childReachable;
+                reachableCount = AssignWordCounts(nextNode, builder, builderLength + 1, reachableCount);
             }
 
             return reachableCount;
@@ -125,7 +115,7 @@ namespace Portent
             var requiredLength = LargePageMemoryChunk.Builder()
                 .ReserveAligned(FirstChildEdgeIndex)
                 .ReserveAligned(EdgeToNodeIndex)
-                .ReserveAligned(EdgeCharacter)
+                .ReserveAligned(EdgeCharacters)
                 .ReserveAligned(ReachableTerminalNodes)
                 .ReserveAligned(WordCounts)
                 .AllocationSize;
@@ -140,7 +130,7 @@ namespace Portent
             stream.WriteCompressed(RootNodeIndex);
             stream.WriteSequentialCompressedToUshort(FirstChildEdgeIndex);
             stream.WriteCompressed(EdgeToNodeIndex);
-            stream.WriteUtf8(EdgeCharacter);
+            stream.WriteUtf8(EdgeCharacters);
             stream.WriteCompressed(ReachableTerminalNodes);
             stream.WriteCompressed(WordCounts);
         }
