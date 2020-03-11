@@ -139,7 +139,7 @@ namespace Portent
         {
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
 #pragma warning disable S1215 // "GC.Collect" should not be called
-            GC.Collect();
+            GC.Collect(); // lgtm[cs/call-to-gc]
 #pragma warning restore S1215 // "GC.Collect" should not be called
         }
     }
