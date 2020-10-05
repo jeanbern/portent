@@ -608,13 +608,13 @@ namespace Portent
             if (index < 0)
             {
                 throw new ArgumentException("Index was outside the bounds of the array. " +
-                                            $"Index must be greater than or equal to 0 but was: {index.ToString()}.", nameof(index));
+                                            $"Index must be greater than or equal to 0 but was: {index}.", nameof(index));
             }
 
             if (index > WordCount)
             {
                 throw new ArgumentException("Index was outside the bounds of the array. " +
-                                            $"Index must be less than the number of elements ({WordCount.ToString()}) but was: {index.ToString()}. " +
+                                            $"Index must be less than the number of elements ({WordCount}) but was: {index}. " +
                                             $"Use {nameof(Dawg)}.{nameof(WordCount)} to check bounds.", nameof(index));
             }
 
