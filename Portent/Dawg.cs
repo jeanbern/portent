@@ -11,7 +11,6 @@ using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 #endif
 using System.Threading.Tasks;
-using LocalsInit;
 
 // ReSharper disable BuiltInTypeReferenceStyle
 
@@ -25,7 +24,6 @@ namespace Portent
 {
     public sealed unsafe class Dawg : IDisposable
     {
-        [LocalsInit(false)]
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         public IEnumerable<SuggestItem> Lookup(in string word, uint maxEdits)
         {
@@ -127,7 +125,6 @@ namespace Portent
             return _compoundResultCollection;
         }
 
-        [LocalsInit(false)]
         [MethodImpl(MethodImplOptions.AggressiveOptimization)]
         [SuppressMessage("Major Code Smell", "S907:\"goto\" statement should not be used")]
         private static void Search5(Job me)
