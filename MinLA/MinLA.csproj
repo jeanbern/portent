@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net5.0</TargetFramework>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -15,13 +15,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ChacoSharp\ChacoSharp.csproj" />
     <ProjectReference Include="..\Portent\Portent.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="ChacoSharp">
-      <HintPath>..\..\..\Users\JPelleri\source\repos\ChacoSharp\bin\Release\netcoreapp3.1\ChacoSharp.dll</HintPath>
-    </Reference>
   </ItemGroup>
 
 </Project>

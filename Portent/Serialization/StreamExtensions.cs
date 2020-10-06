@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
-using LocalsInit;
 
 // ReSharper disable ForCanBeConvertedToForeach
 
@@ -278,7 +277,6 @@ namespace Portent
         #endregion Unsigned
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        [LocalsInit(false)]
         public static void WriteUtf8(this Stream stream, char[] value)
         {
             var encoding = Utf8NoBom;

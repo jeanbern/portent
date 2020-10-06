@@ -1,0 +1,3 @@
+[submodule "ChacoSharp"]
+	path = ChacoSharp
+	url = https://github.com/jeanbern/ChacoSharp
