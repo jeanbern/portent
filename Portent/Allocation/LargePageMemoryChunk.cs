@@ -65,18 +65,22 @@ namespace Portent
             const MemoryAllocationType flags = MemoryAllocationType.MemReserve | MemoryAllocationType.MemCommit;
             const string lockMemory = "SeLockMemoryPrivilege";
             _bytesReserved = MemoryAlignmentHelper.LargePageMultiple(length);
+            try
+            {
+                using var privs = PrivilegeHolder.EnablePrivilege(lockMemory);
+                if (privs != null)
+                {
+                    const MemoryAllocationType largeFlag = flags | MemoryAllocationType.MemLargePages;
+                    _ptr = NativeMethods.VirtualAlloc(IntPtr.Zero, (IntPtr) _bytesReserved, largeFlag, MemoryProtectionConstants.PageReadwrite);
+                    GC.KeepAlive(privs);
+                }
+            }
+            catch (ObjectDisposedException)
+            {
+                // TODO: fix the underlying cause
+            }
 
-            using var privs = PrivilegeHolder.EnablePrivilege(lockMemory);
-            if (privs != null)
-            {
-                const MemoryAllocationType largeFlag = flags | MemoryAllocationType.MemLargePages;
-                _ptr = NativeMethods.VirtualAlloc(IntPtr.Zero, (IntPtr)_bytesReserved, largeFlag, MemoryProtectionConstants.PageReadwrite);
-                GC.KeepAlive(privs);
-            }
-            else
-            {
-                _ptr = NativeMethods.VirtualAlloc(IntPtr.Zero, (IntPtr)_bytesReserved, flags, MemoryProtectionConstants.PageReadwrite);
-            }
+            _ptr = NativeMethods.VirtualAlloc(IntPtr.Zero, (IntPtr)_bytesReserved, flags, MemoryProtectionConstants.PageReadwrite);
         }
 
         public static MemoryChunkBuilder Builder()
