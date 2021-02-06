@@ -2,7 +2,7 @@
 
 namespace Portent
 {
-    public readonly struct SuggestItem : IEquatable<SuggestItem>
+    public class SuggestItem : IEquatable<SuggestItem>
     {
         public readonly string Term;
         public readonly ulong Count;

@@ -28,6 +28,7 @@ namespace MinLA
 
             return true;
         }
+
         public double MakeRandomMove()
         {
             //set _swapIndex1 and _swapIndex2

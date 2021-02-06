@@ -37,7 +37,7 @@ namespace MinLA
             {
                 var pair = edgesPairs[i];
                 edges[i] = pair.Key;
-                edgeWeights[i] = Math.Max(pair.Value, 1.0f);
+                edgeWeights[i] = (float)Math.Max(pair.Value, 1.0f);
             }
 
             edges[^1] = -1;

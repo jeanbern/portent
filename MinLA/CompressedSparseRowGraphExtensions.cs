@@ -130,13 +130,14 @@ namespace MinLA
 
                 var first = graph.FirstChildEdgeIndex[oldNode];
                 var last = graph.FirstChildEdgeIndex[oldNode + 1];
-                var edges = graph.EdgeToNodeIndex.Skip((int)first).Take((int)(last - first)).Select((x, index) => new {x = x, index = index});//.OrderBy(x => x.x);
+                //var edges = graph.EdgeToNodeIndex.Skip((int)first).Take((int)(last - first)).Select((x, index) => new {targetNode = x, index = index}).OrderBy(x => reverse[Math.Abs(x.targetNode)]);
+                var edges = graph.EdgeToNodeIndex.Skip((int)first).Take((int)(last - first)).Select((x, index) => new { targetNode = x, index = index });//.OrderBy(x => reverse[Math.Abs(x.targetNode)]);
 
                 foreach (var edge in edges)
                 {
                     var targetNodeOldGraph = graph.EdgeToNodeIndex[first + edge.index];
-                    Debug.Assert(targetNodeOldGraph == edge.x);
-                    if (targetNodeOldGraph != edge.x)
+                    Debug.Assert(targetNodeOldGraph == edge.targetNode);
+                    if (targetNodeOldGraph != edge.targetNode)
                     {
                         throw new InvalidOperationException("");
                     }
@@ -195,6 +196,22 @@ namespace MinLA
 
             return total;
         }
+        /*
+        public static CompressedSparseRowGraph ArrangeGreedy(this CompressedSparseRowGraph me)
+        {
+            var sorts = new List<Tuple<int, int>>(me.FirstChildEdgeIndex.Length - 1);
+            for(var i = 0; i < me.FirstChildEdgeIndex.Length -1; i++)
+            {
+                var firstChildIndex = me.FirstChildEdgeIndex[i];
+                var lastChildIndex = me.FirstChildEdgeIndex[i + 1];
+                for(var edge = firstChildIndex; edge < lastChildIndex; edge++)
+                {
+                    var targetNode = me.EdgeToNodeIndex[edge];
+
+                }
+            }
+        }
+        */
 
         public static List<UndirectedGraphNode> Convert(this CompressedSparseRowGraph me)
         {
@@ -205,43 +222,77 @@ namespace MinLA
                 result.Add(new UndirectedGraphNode(i));
             }
 
-            for (var i = 1; i < me.FirstChildEdgeIndex.Length; i++)
+            for (var nodeIndexAbs = 0; nodeIndexAbs < me.FirstChildEdgeIndex.Length - 1; nodeIndexAbs++)
             {
-                var last = me.FirstChildEdgeIndex[i];
-                for (var j = me.FirstChildEdgeIndex[i -1]; j < last; j++)
+                var last = me.FirstChildEdgeIndex[nodeIndexAbs + 1];
+                var currentNode = result[nodeIndexAbs];
+                for (var j = me.FirstChildEdgeIndex[nodeIndexAbs]; j < last; j++)
                 {
-                    var nodeIndex = me.EdgeToNodeIndex[j];
-                    var nodeValue = Math.Abs(nodeIndex);
-                    var edgeWeight = me.EdgeWeights[j];
-                    var node = result[nodeValue];
-                    if (nodeIndex < 0)
+                    var childNodeIndex = me.EdgeToNodeIndex[j];
+                    var childNodeIndexAbs = Math.Abs(childNodeIndex);
+                    var weightEdgeToChild = me.EdgeWeights[j];
+                    var childNode = result[childNodeIndexAbs];
+                    if (childNodeIndex < 0)
                     {
-                        node.Terminal = true;
+                        childNode.Terminal = true;
                     }
 
-                    var neighbor = result[i - 1];
-                    neighbor.Children.Add(node.Id);
-                    if (node.Neighbors.ContainsKey(i - 1))
-                    {
-                        node.Neighbors[i - 1] += edgeWeight;
-                    }
-                    else
-                    {
-                        node.Neighbors[i - 1] = edgeWeight;
-                    }
+                    currentNode.Children.Add(childNode.Id);
+                    AddNeighborEdge(nodeIndexAbs, currentNode, childNodeIndexAbs, childNode, weightEdgeToChild);
 
-                    if (neighbor.Neighbors.ContainsKey(nodeValue))
+                    // Sibling section - very time consuming
+                    for (var k = j + 1; k < last; k++)
                     {
-                        neighbor.Neighbors[nodeValue] += edgeWeight;
-                    }
-                    else
-                    {
-                        neighbor.Neighbors[nodeValue] = edgeWeight;
+                        var siblingNodeIndexAbs = Math.Abs(me.EdgeToNodeIndex[k]);
+                        var siblingNode = result[siblingNodeIndexAbs];
+                        AddSiblingEdge(childNodeIndexAbs, childNode, siblingNodeIndexAbs, siblingNode, weightEdgeToChild);
                     }
                 }
             }
 
             return result;
+        }
+
+        private static void AddNeighborEdge(int node1IndexAbs, UndirectedGraphNode node1, int node2IndexAbs, UndirectedGraphNode node2, double edgeWeight)
+        {
+            if (node2.Neighbors.ContainsKey(node1IndexAbs))
+            {
+                node2.Neighbors[node1IndexAbs] += edgeWeight;
+            }
+            else
+            {
+                node2.Neighbors[node1IndexAbs] = edgeWeight;
+            }
+
+            if (node1.Neighbors.ContainsKey(node2IndexAbs))
+            {
+                node1.Neighbors[node2IndexAbs] += edgeWeight;
+            }
+            else
+            {
+                node1.Neighbors[node2IndexAbs] = edgeWeight;
+            }
+        }
+
+        private static void AddSiblingEdge(int node1IndexAbs, UndirectedGraphNode node1, int node2IndexAbs, UndirectedGraphNode node2, double edgeWeight)
+        {
+            if (node2.Siblings.ContainsKey(node1IndexAbs))
+            {
+                node2.Siblings[node1IndexAbs] += edgeWeight;
+            }
+            else
+            {
+                node2.Siblings[node1IndexAbs] = edgeWeight;
+            }
+
+            if (node1.Siblings.ContainsKey(node2IndexAbs))
+            {
+                node1.Siblings[node2IndexAbs] += edgeWeight;
+            }
+            else
+            {
+                node1.Siblings[node2IndexAbs] = edgeWeight;
+            }
         }
     }
 }

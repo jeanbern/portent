@@ -33,6 +33,27 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MinLA", "MinLA\MinLA.csproj
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ChacoSharp", "ChacoSharp\ChacoSharp.csproj", "{379A0679-7276-45D3-89CE-02B753809E99}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PerformanceTesting", "PerformanceTesting\PerformanceTesting.csproj", "{434B08EA-5CC4-421B-90A0-4B46F9607CA4}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Old", "Old", "{6A0905C9-2ED2-4F9E-9CA4-EEDB4F6CBF5F}"
+	ProjectSection(SolutionItems) = preProject
+		PerformanceTesting\DawgForArticle\Dawg04.cs = PerformanceTesting\DawgForArticle\Dawg04.cs
+		PerformanceTesting\DawgForArticle\Dawg05.cs = PerformanceTesting\DawgForArticle\Dawg05.cs
+		PerformanceTesting\DawgForArticle\Dawg06.cs = PerformanceTesting\DawgForArticle\Dawg06.cs
+		PerformanceTesting\DawgForArticle\Dawg07.cs = PerformanceTesting\DawgForArticle\Dawg07.cs
+		PerformanceTesting\DawgForArticle\Dawg08.cs = PerformanceTesting\DawgForArticle\Dawg08.cs
+		PerformanceTesting\DawgForArticle\Dawg09.cs = PerformanceTesting\DawgForArticle\Dawg09.cs
+		PerformanceTesting\DawgForArticle\Dawg10.cs = PerformanceTesting\DawgForArticle\Dawg10.cs
+		PerformanceTesting\DawgForArticle\Dawg11.cs = PerformanceTesting\DawgForArticle\Dawg11.cs
+		PerformanceTesting\DawgForArticle\Dawg12.cs = PerformanceTesting\DawgForArticle\Dawg12.cs
+		PerformanceTesting\DawgForArticle\Dawg13.cs = PerformanceTesting\DawgForArticle\Dawg13.cs
+		PerformanceTesting\DawgForArticle\Dawg14.cs = PerformanceTesting\DawgForArticle\Dawg14.cs
+		PerformanceTesting\DawgForArticle\Dawg15.cs = PerformanceTesting\DawgForArticle\Dawg15.cs
+		PerformanceTesting\DawgForArticle\Dawg16.cs = PerformanceTesting\DawgForArticle\Dawg16.cs
+		PerformanceTesting\DawgForArticle\Dawg18.cs = PerformanceTesting\DawgForArticle\Dawg18.cs
+		PerformanceTesting\DawgForArticle\Dawg98.cs = PerformanceTesting\DawgForArticle\Dawg98.cs
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -81,6 +102,14 @@ Global
 		{379A0679-7276-45D3-89CE-02B753809E99}.Release|Any CPU.Build.0 = Release|Any CPU
 		{379A0679-7276-45D3-89CE-02B753809E99}.Release|x64.ActiveCfg = Release|Any CPU
 		{379A0679-7276-45D3-89CE-02B753809E99}.Release|x64.Build.0 = Release|Any CPU
+		{434B08EA-5CC4-421B-90A0-4B46F9607CA4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{434B08EA-5CC4-421B-90A0-4B46F9607CA4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{434B08EA-5CC4-421B-90A0-4B46F9607CA4}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{434B08EA-5CC4-421B-90A0-4B46F9607CA4}.Debug|x64.Build.0 = Debug|Any CPU
+		{434B08EA-5CC4-421B-90A0-4B46F9607CA4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{434B08EA-5CC4-421B-90A0-4B46F9607CA4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{434B08EA-5CC4-421B-90A0-4B46F9607CA4}.Release|x64.ActiveCfg = Release|Any CPU
+		{434B08EA-5CC4-421B-90A0-4B46F9607CA4}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

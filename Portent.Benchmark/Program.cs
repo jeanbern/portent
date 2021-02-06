@@ -1,6 +1,8 @@
 ﻿using BenchmarkDotNet.Running;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 
 namespace Portent.Benchmark
@@ -28,16 +30,22 @@ namespace Portent.Benchmark
                 throw new InvalidOperationException();
             }
 
-            var results = string.Join(", ", benchmark._dawg.Lookup("adventures", 3).Select(x => x.Term));
-            Console.WriteLine(results);
+            //var results = string.Join(", ", benchmark._dawg.LookupSync("adventures", 3));
+            var results2 = string.Join(", ", benchmark._dawg.Lookup("adventures", 3).Select(x => x.Term));
+            //Console.WriteLine(results);
+            Console.WriteLine(results2);
 
             for (var i = 0u; i < 4u; i++)
             {
                 benchmark.MaxErrors = i;
-                Console.WriteLine(benchmark.GetTotalResults());
-            }
+                for (var j = 0; j < 1000; j++)
+                {
+                    //benchmark.GetTotalResults();
+                }
 
-            Console.ReadLine();
+                Console.WriteLine(benchmark.GetTotalResults());
+                //benchmark.Benchmark();
+            }
         }
     }
 }

@@ -135,6 +135,36 @@ namespace Portent
             stream.WriteCompressed(WordCounts);
         }
 
+        public CompressedSparseRowGraph(Stream stream)
+        {
+            stream.ReadCompressedULong();
+            RootNodeIndex = stream.ReadCompressedInt();
+
+            var firstChildEdgeIndexCount = stream.ReadCompressedUInt();
+            FirstChildEdgeIndex = new uint[firstChildEdgeIndexCount];
+            stream.ReadSequentialCompressedUshortToUint(FirstChildEdgeIndex);
+
+            var edgeToNodeIndexCount = stream.ReadCompressedUInt();
+            EdgeToNodeIndex = new int[edgeToNodeIndexCount];
+            stream.ReadCompressed(EdgeToNodeIndex);
+
+            var byteLength = stream.ReadCompressedUInt();
+            var charLength = stream.ReadCompressedUInt();
+            EdgeCharacters = new char[charLength];
+            stream.ReadUtf8(EdgeCharacters, byteLength);
+
+            var reachableTerminalNodesCount = stream.ReadCompressedUInt();
+            ReachableTerminalNodes = new ushort[reachableTerminalNodesCount];
+            stream.ReadCompressed(ReachableTerminalNodes);
+
+            var wordCount = stream.ReadCompressedUInt();
+            WordCounts = new ulong[wordCount];
+            stream.ReadCompressed(WordCounts);
+
+            EdgeWeights = Array.Empty<float>();
+            DictionaryCounts = new Dictionary<string, ulong>();
+        }
+
         public void Dispose()
         {
             GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;

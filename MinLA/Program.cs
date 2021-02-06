@@ -7,13 +7,13 @@ namespace MinLA
 {
     public static class Program
     {
-        private const string NormalPath = @"C:\Users\JPelleri\source\repos\portent\portent.Benchmark\lev7.easyTopological";
-        private const string TopologicallyAnnealedPath = @"C:\Users\JPelleri\source\repos\portent\portent.Benchmark\lev7.topoAnneal";
-        private const string SpectralPath = @"C:\Users\JPelleri\source\repos\portent\portent.Benchmark\lev7.Spectral";
-        private const string AnnealedPath = @"C:\Users\JPelleri\source\repos\portent\portent.Benchmark\lev7.annealed";
-        private const string DictionaryPath = @"C:\Users\JPelleri\source\repos\portent\portent.Benchmark\frequency_dictionary_en_500_000.txt";
-        private const string CacheAwareTopologicalPath = @"C:\Users\JPelleri\source\repos\portent\portent.Benchmark\lev7.cacheAwareTopological";
-        private const string CacheAwarePath = @"C:\Users\JPelleri\source\repos\portent\portent.Benchmark\lev7.cacheAware";
+        private const string NormalPath = @"C:\Users\jeanbern\source\repos\portent\portent.Benchmark\lev7.easyTopological";
+        private const string TopologicallyAnnealedPath = @"C:\Users\jeanbern\source\repos\portent\portent.Benchmark\lev7.topoAnneal";
+        private const string SpectralPath = @"C:\Users\jeanbern\source\repos\portent\portent.Benchmark\lev7.Spectral";
+        private const string AnnealedPath = @"C:\Users\jeanbern\source\repos\portent\portent.Benchmark\lev7.annealed";
+        private const string DictionaryPath = @"C:\Users\jeanbern\source\repos\portent\portent.Benchmark\frequency_dictionary_en_500_000.txt";
+        private const string CacheAwareTopologicalPath = @"C:\Users\jeanbern\source\repos\portent\portent.Benchmark\lev7.cacheAwareTopological";
+        private const string CacheAwarePath = @"C:\Users\jeanbern\source\repos\portent\portent.Benchmark\lev7.cacheAware";
 
         public static void Main()
         {
@@ -21,6 +21,81 @@ namespace MinLA
             //ShrinkGraph();
             //ArrangeGraphs();
             ArrangeGraphsCacheAware();
+            //PrintStuff();
+            //Span();
+        }
+        
+        private static void PrintStuff()
+        {
+            Console.WriteLine("Reading...");
+            var graph = BuildGraph(DictionaryPath);
+            Console.WriteLine("Ready!\n");
+            var counts = new int[64];
+            for (var i = 0; i < graph.FirstChildEdgeIndex.Length - 1; i++)
+            {
+                var firstChildIndex = graph.FirstChildEdgeIndex[i];
+                var lastChildIndex = graph.FirstChildEdgeIndex[i + 1];
+                for (var edge = firstChildIndex; edge < lastChildIndex; edge++)
+                {
+                    var edgeWeight = graph.EdgeWeights[edge];
+                    counts[(int)Math.Log2(edgeWeight)]++;
+                }
+            }
+
+            Console.WriteLine(string.Join(", ", counts));
+        }
+
+        private static void Span()
+        {
+            Console.WriteLine("Reading...");
+            var graph = BuildGraph(DictionaryPath);
+            Console.WriteLine("Ready!\n");
+
+            var firstChildIndex = graph.FirstChildEdgeIndex[graph.RootNodeIndex];
+            var lastChildIndex = graph.FirstChildEdgeIndex[graph.RootNodeIndex + 1];
+            var totalVisits = new int[graph.FirstChildEdgeIndex.Length -1];
+            for (var i = firstChildIndex; i < lastChildIndex; i++)
+            {
+                var visited = new bool[graph.FirstChildEdgeIndex.Length -1];
+                Visit(graph, (uint)Math.Abs(graph.EdgeToNodeIndex[i]), visited);
+                var visitedCount = 0;
+                for(var j = 0; j < visited.Length; j++)
+                {
+                    var single = visited[j];
+                    if (single)
+                    {
+                        visitedCount++;
+                        totalVisits[j]++;
+                    }
+                }
+
+                Console.WriteLine($"{i:D2}: {visitedCount}");
+            }
+
+            var chart = new int[lastChildIndex - firstChildIndex + 1];
+            for(var i = 0; i < totalVisits.Length; i++)
+            {
+                chart[totalVisits[i]]++;
+            }
+
+            Console.WriteLine(string.Join(", ", chart));
+        }
+
+        private static void Visit(CompressedSparseRowGraph graph, uint baseNode, bool[] visited)
+        {
+            var firstChildIndex = graph.FirstChildEdgeIndex[baseNode];
+            var lastChildIndex = graph.FirstChildEdgeIndex[baseNode + 1];
+            for (var edge = firstChildIndex; edge < lastChildIndex; edge++)
+            {
+                var nextNode = Math.Abs(graph.EdgeToNodeIndex[edge]);
+                if (visited[nextNode])
+                {
+                    continue;
+                }
+
+                visited[nextNode] = true;
+                Visit(graph, (uint)nextNode, visited);
+            }
         }
 
         private static void ShrinkGraph()
@@ -48,7 +123,7 @@ namespace MinLA
                 } while (newCost != lastCost);
             }
 
-            NewNode.WriteD3JsonFormat(nodes, @"C:\Users\JPelleri\source\repos\portent\portent.Benchmark\graph2.json");
+            NewNode.WriteD3JsonFormat(nodes, @"C:\Users\jeanbern\source\repos\portent\portent.Benchmark\graph2.json");
         }
 
         private static NewNode[] ConvertToNewNodes(CompressedSparseRowGraph graph)
@@ -158,10 +233,10 @@ namespace MinLA
             //*/var topologicalCacheGraph = graph;
 
             Console.WriteLine("Starting CacheAware Annealing");
-            var (_, cacheArrangement) = Annealer.Anneal<CacheAwareInstance, int[]>(
-                new CacheAwareInstance(topologicalCacheGraph),
+            var (_, cacheArrangement) = Annealer.Anneal<TopoCacheAwareSibling, int[]>(
+                new TopoCacheAwareSibling(topologicalCacheGraph),
                 7654324,
-                0.005d,
+                0.00005d,
                 .999999995d,
                 .000000001d);
             Console.WriteLine("Arranging");
@@ -215,12 +290,12 @@ namespace MinLA
             Console.WriteLine("Building");
             var graph = BuildGraph(DictionaryPath);
             Console.WriteLine("Converting");
-            graph.WriteD3JsonFormat(@"C:\Users\JPelleri\source\repos\portent\portent.Benchmark\graph.json");
+            graph.WriteD3JsonFormat(@"C:\Users\jeanbern\source\repos\portent\portent.Benchmark\graph.json");
         }
 
         private static CompressedSparseRowGraph BuildGraph(string corpusPath)
         {
-            var builder = new PartitionedGraphBuilder();
+            var builder = new PartitionedGraphBuilder2();
             using (var stream = File.OpenRead(corpusPath))
             {
                 if (stream == null)

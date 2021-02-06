@@ -12,6 +12,7 @@ namespace MinLA
         public bool Terminal;
         public int Id { get; }
         public List<int> Children { get; } = new List<int>();
-        public Dictionary<int, float> Neighbors { get; } = new Dictionary<int, float>();
+        public Dictionary<int, double> Neighbors { get; } = new Dictionary<int, double>();
+        public Dictionary<int, double> Siblings { get; } = new Dictionary<int, double>();
     }
 }

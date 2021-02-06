@@ -6,11 +6,14 @@ using System.Runtime;
 
 namespace Portent.Benchmark
 {
+    [MemoryDiagnoser]
     public class DawgBenchmark : IDisposable
     {
         // Backtrack from /bin/$(Configuration)/netcore3.0/
-        private const string SaveLocation = @"C:\Users\JPelleri\source\repos\portent\portent.Benchmark\lev7.augv5";
-        private const string Query1K = @"C:\Users\JPelleri\source\repos\portent\portent.Benchmark\noisy_query_en_1000.txt";
+        private const string SaveLocation = @"C:\Users\jeanbern\source\repos\portent\portent.Benchmark\lev7.easyTopological";
+        //private const string SaveLocation = @"C:\Users\jeanbern\source\repos\portent\portent.Benchmark\partition2.aug";
+        //private const string SaveLocation = @"C:\Users\jeanbern\source\repos\portent\portent.Benchmark\lev7.cacheAware";
+        private const string Query1K = @"C:\Users\jeanbern\source\repos\portent\portent.Benchmark\noisy_query_en_1000.txt";
 
         internal readonly Dawg _dawg;
         private readonly string[] _words;
@@ -20,6 +23,7 @@ namespace Portent.Benchmark
             var prefix = string.Empty;
             using var dawgStream = File.OpenRead(prefix + SaveLocation);
             _dawg = new Dawg(dawgStream);
+            //_dawg = CreateDictionary(@"C:\Users\jeanbern\source\repos\portent\portent.Benchmark\frequency_dictionary_en_500_000.txt", @"C:\Users\jeanbern\source\repos\portent\portent.Benchmark\partition2.aug");
             using var queryStream = File.OpenRead(prefix + Query1K);
             _words = BuildQuery1K(queryStream);
         }
@@ -57,14 +61,9 @@ namespace Portent.Benchmark
         // ReSharper disable once UnusedMember.Global
         public static Dawg CreateDictionary(string corpusPath, string savePath)
         {
-            var builder = new PartitionedGraphBuilder();
+            var builder = new PartitionedGraphBuilder2();
             using (var stream = File.OpenRead(corpusPath))
             {
-                if (stream == null)
-                {
-                    throw new InvalidOperationException();
-                }
-
                 using var reader = new StreamReader(stream);
                 string? line;
                 while ((line = reader.ReadLine()) != null)
@@ -93,7 +92,8 @@ namespace Portent.Benchmark
             return new Dawg(dawgStream);
         }
 
-        [Params(0u, 1u, 2u, 3u)]
+        [Params(2u)]
+        //[Params(0u, 1u, 2u, 3u)]
         public uint MaxErrors { get; set; }
 
         [GlobalSetup]
@@ -125,7 +125,7 @@ namespace Portent.Benchmark
             // ReSharper disable once LoopCanBeConvertedToQuery
             foreach (var word in _words)
             {
-                total += dawg.Lookup(word, MaxErrors).ToList().Count;
+                total += dawg.Lookup(word, MaxErrors).Count();
             }
 
             return total;

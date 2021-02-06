@@ -58,6 +58,14 @@ namespace Portent
             }
         }
 
+        public static unsafe void ReadCompressed(this Stream stream, Span<int> pointer)
+        {
+            for(var index = 0; index < pointer.Length; index++)
+            {
+                pointer[index] = stream.ReadCompressedInt();
+            }
+        }
+
         #endregion Signed
 
         #region Unsigned
@@ -135,6 +143,13 @@ namespace Portent
                 count--;
             }
         }
+        public static unsafe void ReadCompressed(this Stream stream, Span<ushort> pointer)
+        {
+            for (var i = 0; i < pointer.Length; i++)
+            {
+                pointer[i] = stream.ReadCompressedUShort();
+            }
+        }
 
         public static unsafe void ReadCompressed(this Stream stream, ulong* pointer, uint count)
         {
@@ -143,6 +158,14 @@ namespace Portent
                 *pointer = stream.ReadCompressedULong();
                 pointer++;
                 count--;
+            }
+        }
+
+        public static unsafe void ReadCompressed(this Stream stream, Span<ulong> pointer)
+        {
+            for(var i = 0; i < pointer.Length; i++)
+            {
+                pointer[i] = stream.ReadCompressedULong();
             }
         }
 
@@ -159,6 +182,17 @@ namespace Portent
             }
         }
 
+        public static unsafe void ReadSequentialCompressedUshortToUint(this Stream stream, Span<uint> pointer)
+        {
+            var currentValue = 0u;
+            for(var index = 0; index < pointer.Length; index++)
+            {
+                var stepValue = stream.ReadCompressedUShort();
+                currentValue += stepValue;
+                pointer[index] = currentValue;
+            }
+        }
+
         #endregion Unsigned
 
         public static unsafe void ReadUtf8(this Stream stream, char* pointer, uint byteLength, uint charLength)
@@ -172,14 +206,24 @@ namespace Portent
             var converted = Utf8NoBom.GetChars(span, spp);
             Debug.Assert(converted == charLength);
         }
+        public static unsafe void ReadUtf8(this Stream stream, Span<char> pointer, uint byteLength)
+        {
+            Span<byte> span = stackalloc byte[(int)byteLength];
+            // ReSharper disable once RedundantAssignment
+            var read = stream.Read(span);
+            Debug.Assert(read == byteLength);
+            // ReSharper disable once RedundantAssignment
+            var converted = Utf8NoBom.GetChars(span, pointer);
+            Debug.Assert(converted == pointer.Length);
+        }
 
-        #endregion Read
+            #endregion Read
 
-        #region Write
+            #region Write
 
-        #region Signed
+            #region Signed
 
-        public static void WriteCompressed(this Stream stream, int value)
+            public static void WriteCompressed(this Stream stream, int value)
         {
             WriteCompressed(stream, (long) value);
         }
